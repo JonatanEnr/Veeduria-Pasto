@@ -1,0 +1,57 @@
+@import "tailwindcss";
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  @apply bg-slate-100 text-slate-800 antialiased;
+}
+
+/* El mapa debe ocupar todo su contenedor */
+.leaflet-container {
+  width: 100%;
+  height: 100%;
+  font-family: inherit;
+  cursor: crosshair;
+}
+
+/* Marcadores personalizados (divIcon) */
+.marcador-denuncia {
+  background: transparent;
+  border: none;
+}
+
+.marcador-denuncia .pin {
+  width: 26px;
+  height: 26px;
+  border-radius: 50% 50% 50% 0;
+  transform: rotate(-45deg);
+  border: 3px solid #fff;
+  box-shadow: 0 2px 6px rgb(0 0 0 / 0.35);
+}
+
+.marcador-denuncia .pin.pendiente {
+  background: #dc2626; /* Rojo */
+}
+
+.marcador-denuncia .pin.solucionado {
+  background: #16a34a; /* Verde */
+}
+
+.marcador-denuncia .pin.nuevo {
+  background: #2563eb;
+  animation: latido 1.2s ease-in-out infinite;
+}
+
+@keyframes latido {
+  0%, 100% { transform: rotate(-45deg) scale(1); }
+  50% { transform: rotate(-45deg) scale(1.15); }
+}
+
+.leaflet-popup-content {
+  margin: 12px 14px;
+  min-width: 240px;
+}

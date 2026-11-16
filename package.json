@@ -1,0 +1,25 @@
+{
+  "name": "mapa-denuncias-pasto",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Mapa ciudadano de denuncias - Veeduría San Juan de Pasto",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "2.50.0",
+    "leaflet": "1.9.4",
+    "react": "18.3.1",
+    "react-dom": "18.3.1",
+    "react-leaflet": "4.2.1"
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "4.1.11",
+    "@vitejs/plugin-react": "4.6.0",
+    "tailwindcss": "4.1.11",
+    "vite": "6.3.5"
+  }
+}
