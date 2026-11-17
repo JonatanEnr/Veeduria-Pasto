@@ -1,9 +1,11 @@
 import { useCallback, useEffect, useState } from 'react'
 import {
-  listarDenuncias, crearDenuncia, cambiarEstado, eliminarDenuncia,
+  listarDenuncias, crearDenuncia, cambiarEstado, moderarDenuncia, eliminarDenuncia,
 } from '../services/almacenamiento'
 
-export function useDenuncias() {
+// esAdmin cambia lo que se trae: el veedor ve también lo que está en revisión
+// y los datos de contacto del denunciante.
+export function useDenuncias(esAdmin) {
   const [denuncias, setDenuncias] = useState([])
   const [cargando, setCargando] = useState(true)
   const [error, setError] = useState(null)
@@ -11,49 +13,51 @@ export function useDenuncias() {
   const recargar = useCallback(async () => {
     setCargando(true)
     try {
-      setDenuncias(await listarDenuncias())
+      setDenuncias(await listarDenuncias({ admin: esAdmin }))
       setError(null)
     } catch (e) {
       setError(e.message)
     } finally {
       setCargando(false)
     }
-  }, [])
+  }, [esAdmin])
 
   useEffect(() => { recargar() }, [recargar])
 
-  // Lanza el error para que el formulario lo muestre
+  const reemplazar = (actualizada) =>
+    setDenuncias((prev) => prev.map((d) => (d.id === actualizada.id ? actualizada : d)))
+
+  // Lanza el error para que el formulario lo muestre.
+  // Devuelve la denuncia (admin) o null (ciudadano: queda en revisión).
   const agregar = useCallback(async (datos) => {
-    const nueva = await crearDenuncia(datos)
-    setDenuncias((prev) => [nueva, ...prev])
+    const nueva = await crearDenuncia(datos, { admin: esAdmin })
+    if (nueva) setDenuncias((prev) => [nueva, ...prev])
     return nueva
+  }, [esAdmin])
+
+  const ejecutar = useCallback(async (fn) => {
+    try { await fn() } catch (e) { setError(e.message) }
   }, [])
 
-  const alternarEstado = useCallback(async (id) => {
+  const alternarEstado = useCallback((id) => ejecutar(async () => {
     const actual = denuncias.find((d) => d.id === id)
     if (!actual) return
-    try {
-      const nuevo = actual.estado === 'solucionado' ? 'pendiente' : 'solucionado'
-      const actualizada = await cambiarEstado(id, nuevo)
-      setDenuncias((prev) => prev.map((d) => (d.id === id ? actualizada : d)))
-    } catch (e) {
-      setError(e.message)
-    }
-  }, [denuncias])
+    reemplazar(await cambiarEstado(id, actual.estado === 'solucionado' ? 'pendiente' : 'solucionado'))
+  }), [denuncias, ejecutar])
 
-  const eliminar = useCallback(async (id) => {
+  const moderar = useCallback((id, decision) => ejecutar(async () => {
+    reemplazar(await moderarDenuncia(id, decision))
+  }), [ejecutar])
+
+  const eliminar = useCallback((id) => ejecutar(async () => {
     const actual = denuncias.find((d) => d.id === id)
     if (!actual) return
-    try {
-      await eliminarDenuncia(actual)
-      setDenuncias((prev) => prev.filter((d) => d.id !== id))
-    } catch (e) {
-      setError(e.message)
-    }
-  }, [denuncias])
+    await eliminarDenuncia(actual)
+    setDenuncias((prev) => prev.filter((d) => d.id !== id))
+  }), [denuncias, ejecutar])
 
   return {
     denuncias, cargando, error, limpiarError: () => setError(null),
-    recargar, agregar, alternarEstado, eliminar,
+    recargar, agregar, alternarEstado, moderar, eliminar,
   }
 }

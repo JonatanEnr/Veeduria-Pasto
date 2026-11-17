@@ -20,7 +20,15 @@ const ICONOS = {
   pendiente: crearIcono('pendiente'),
   solucionado: crearIcono('solucionado'),
   nuevo: crearIcono('nuevo'),
+  revision: crearIcono('revision'),
+  rechazada: crearIcono('rechazada'),
 }
+
+// Lo que no está aprobado (solo lo ve el veedor) se pinta distinto
+const iconoDe = (d) =>
+  d.moderacion === 'revision' || d.moderacion === 'rechazada'
+    ? ICONOS[d.moderacion]
+    : ICONOS[d.estado] ?? ICONOS.pendiente
 
 function CapturadorClics({ onClick }) {
   useMapEvents({
@@ -42,7 +50,7 @@ function VolarA({ denuncia, marcadores }) {
 }
 
 export default function MapaPasto({
-  denuncias, puntoNuevo, seleccionada, esAdmin, onClickMapa, onAlternarEstado, onEliminar,
+  denuncias, puntoNuevo, seleccionada, esAdmin, onClickMapa, onAlternarEstado, onModerar, onEliminar,
 }) {
   const marcadores = useRef({})
 
@@ -65,7 +73,7 @@ export default function MapaPasto({
         <Marker
           key={d.id}
           position={[d.lat, d.lng]}
-          icon={ICONOS[d.estado] ?? ICONOS.pendiente}
+          icon={iconoDe(d)}
           ref={(m) => { if (m) marcadores.current[d.id] = m; else delete marcadores.current[d.id] }}
         >
           <Popup maxWidth={300}>
@@ -73,6 +81,7 @@ export default function MapaPasto({
               denuncia={d}
               esAdmin={esAdmin}
               onAlternarEstado={onAlternarEstado}
+              onModerar={onModerar}
               onEliminar={onEliminar}
             />
           </Popup>
