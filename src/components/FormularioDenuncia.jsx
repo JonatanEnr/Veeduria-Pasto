@@ -4,6 +4,7 @@ import Captcha from './Captcha'
 import { SECRETARIAS, obtenerSecretaria } from '../constants/secretarias'
 import { CAPTCHA_SITE_KEY } from '../services/almacenamiento'
 import { distanciaMetros } from '../utils/geo'
+import { MOSTRAR_POLITICA } from '../constants/organizacion'
 import { diasDenuncia, textoDias } from '../utils/fechas'
 import { obtenerDireccion } from '../services/geocodificacion'
 import { comprimirImagen } from '../utils/imagen'
@@ -385,10 +386,15 @@ export default function FormularioDenuncia({
                   <span>
                     Autorizo a la Veeduría Ciudadana de Pasto a tratar mis datos personales (nombre, celular y cargo)
                     conforme a la <strong className="font-semibold text-slate-800">Ley 1581 de 2012</strong>, únicamente para
-                    verificar esta denuncia y contactarme sobre su seguimiento. No serán publicados ni compartidos.{' '}
-                    <button type="button" onClick={() => onLegal('privacidad')} className="font-semibold text-slate-900 underline">
-                      Leer la política
-                    </button>
+                    verificar esta denuncia y contactarme sobre su seguimiento. No serán publicados ni compartidos.
+                    {MOSTRAR_POLITICA && (
+                      <>
+                        {' '}
+                        <button type="button" onClick={() => onLegal('privacidad')} className="font-semibold text-slate-900 underline">
+                          Leer la política
+                        </button>
+                      </>
+                    )}
                   </span>
                 </label>
               </div>

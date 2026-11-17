@@ -10,4 +10,8 @@ export const ORGANIZACION = {
   politicaActualizada: '16 de noviembre de 2026',
 }
 
-export const pendiente = (valor, texto = '[pendiente de completar]') => valor?.trim() || texto
+// Cambiar a true cuando estén completos "responsable" y "correo":
+// muestra la Política de tratamiento de datos (enlace en el panel y en el formulario).
+export const MOSTRAR_POLITICA = false
+
+export const pendiente =(valor, texto = '[pendiente de completar]') => valor?.trim() || texto

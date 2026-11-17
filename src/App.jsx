@@ -6,7 +6,7 @@ import DetalleDenuncia from './components/DetalleDenuncia'
 import FormularioDenuncia from './components/FormularioDenuncia'
 import ModalIngreso from './components/ModalIngreso'
 import Estadisticas from './components/Estadisticas'
-import PaginasLegales from './components/PaginasLegales'
+import PaginasLegales, { paginaLegalDisponible } from './components/PaginasLegales'
 import Icono from './components/Iconos'
 import { useDenuncias } from './hooks/useDenuncias'
 import { useSesion } from './hooks/useSesion'
@@ -42,7 +42,7 @@ const dentroDePasto = (lat, lng) => {
 
 const paginaLegalDelHash = () => {
   const h = window.location.hash.replace('#', '')
-  return h === 'privacidad' || h === 'criterios' ? h : null
+  return paginaLegalDisponible(h) ? h : null
 }
 
 function useEsMovil() {

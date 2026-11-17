@@ -1,6 +1,6 @@
 import { useEffect } from 'react'
 import Icono from './Iconos'
-import { ORGANIZACION as O, pendiente } from '../constants/organizacion'
+import { ORGANIZACION as O, MOSTRAR_POLITICA, pendiente } from '../constants/organizacion'
 
 function Politica() {
   return (
@@ -88,9 +88,11 @@ function Criterios() {
 }
 
 const PAGINAS = {
-  privacidad: { titulo: 'Política de tratamiento de datos', Contenido: Politica },
+  ...(MOSTRAR_POLITICA ? { privacidad: { titulo: 'Política de tratamiento de datos', Contenido: Politica } } : {}),
   criterios: { titulo: 'Criterios de moderación', Contenido: Criterios },
 }
+
+export const paginaLegalDisponible = (p) => p in PAGINAS
 
 export default function PaginasLegales({ pagina, onCambiar, onCerrar }) {
   useEffect(() => {
@@ -99,7 +101,8 @@ export default function PaginasLegales({ pagina, onCambiar, onCerrar }) {
     return () => window.removeEventListener('keydown', esc)
   }, [onCerrar])
 
-  const { titulo, Contenido } = PAGINAS[pagina] ?? PAGINAS.privacidad
+  const { titulo, Contenido } = PAGINAS[pagina] ?? PAGINAS.criterios
+  const variasPaginas = Object.keys(PAGINAS).length > 1
 
   return (
     <div className="fixed inset-0 z-[1100] flex items-end justify-center bg-slate-900/50 backdrop-blur-[2px] sm:items-center sm:p-4" onClick={onCerrar}>
@@ -112,14 +115,15 @@ export default function PaginasLegales({ pagina, onCambiar, onCerrar }) {
               <Icono nombre="x" className="h-5 w-5" />
             </button>
           </div>
-          <nav className="mt-2 flex gap-4 text-sm font-semibold">
+          {!variasPaginas && <div className="h-3" />}
+          {variasPaginas && <nav className="mt-2 flex gap-4 text-sm font-semibold">
             {Object.entries(PAGINAS).map(([id, p]) => (
               <button key={id} type="button" onClick={() => onCambiar(id)}
                 className={`border-b-2 pb-2 ${pagina === id ? 'border-slate-900 text-slate-900' : 'border-transparent text-slate-500 hover:text-slate-800'}`}>
                 {id === 'privacidad' ? 'Datos personales' : 'Moderación'}
               </button>
             ))}
-          </nav>
+          </nav>}
         </header>
         <div className="desplazable flex-1 overflow-y-auto px-4 py-5 text-sm leading-relaxed text-slate-700 sm:px-6
           [&_h3]:mb-1.5 [&_h3]:mt-5 [&_h3]:font-bold [&_h3]:text-slate-900 [&_li]:mb-1 [&_p]:mb-3 [&_ul]:mb-3 [&_ul]:list-disc [&_ul]:pl-5">

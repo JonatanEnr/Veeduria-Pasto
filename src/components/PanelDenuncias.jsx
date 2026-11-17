@@ -2,6 +2,7 @@ import Icono from './Iconos'
 import { Insignia, ContadorDias } from './DetalleDenuncia'
 import { SECRETARIAS, obtenerSecretaria, ESTADOS, MODERACION } from '../constants/secretarias'
 import { haceCuanto } from '../utils/fechas'
+import { MOSTRAR_POLITICA } from '../constants/organizacion'
 
 const PESTANAS = [
   { id: 'mapa', etiqueta: 'Publicadas' },
@@ -203,8 +204,12 @@ export default function PanelDenuncias({
       </ul>
 
       <footer className="flex shrink-0 flex-wrap items-center justify-center gap-x-3 gap-y-1 border-t border-slate-100 px-4 py-2 text-[11px] text-slate-500">
-        <button type="button" onClick={() => onLegal('privacidad')} className="hover:text-slate-900 hover:underline">Política de datos</button>
-        <span aria-hidden="true">·</span>
+        {MOSTRAR_POLITICA && (
+          <>
+            <button type="button" onClick={() => onLegal('privacidad')} className="hover:text-slate-900 hover:underline">Política de datos</button>
+            <span aria-hidden="true">·</span>
+          </>
+        )}
         <button type="button" onClick={() => onLegal('criterios')} className="hover:text-slate-900 hover:underline">Criterios de moderación</button>
         <span aria-hidden="true">·</span>
         <span>Mapa © OpenStreetMap</span>
