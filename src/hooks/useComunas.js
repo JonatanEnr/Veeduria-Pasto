@@ -1,16 +1,20 @@
 import { useEffect, useState } from 'react'
 
-// Límites de las 12 comunas de Pasto (OpenStreetMap, ODbL), en /public.
+// Límites oficiales (OpenStreetMap, ODbL) guardados en /public:
+//  - municipio-pasto.geojson: borde de todo el municipio
+//  - comunas-pasto.geojson: las 12 comunas urbanas
 let cache = null
 
-export function useComunas() {
-  const [comunas, setComunas] = useState(cache)
+export function useZonas() {
+  const [zonas, setZonas] = useState(cache ?? { municipio: null, comunas: null })
   useEffect(() => {
     if (cache) return
-    fetch('/comunas-pasto.geojson')
-      .then((r) => (r.ok ? r.json() : null))
-      .then((g) => { cache = g; setComunas(g) })
-      .catch(() => setComunas(null))
+    const leer = (url) => fetch(url).then((r) => (r.ok ? r.json() : null)).catch(() => null)
+    Promise.all([leer('/municipio-pasto.geojson'), leer('/comunas-pasto.geojson')])
+      .then(([municipio, comunas]) => {
+        cache = { municipio, comunas }
+        setZonas(cache)
+      })
   }, [])
-  return comunas
+  return zonas
 }

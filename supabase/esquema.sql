@@ -12,9 +12,9 @@ create table if not exists public.denuncias (
   secretaria      text not null check (char_length(secretaria) <= 40),
   direccion       text check (char_length(direccion) <= 200),
   barrio          text check (char_length(barrio) <= 120),
-  -- Coordenadas restringidas al área de Pasto
-  lat             double precision not null check (lat between 1.13 and 1.29),
-  lng             double precision not null check (lng between -77.37 and -77.19),
+  -- Coordenadas restringidas al municipio de Pasto (urbano + corregimientos)
+  lat             double precision not null check (lat between 0.81 and 1.365),
+  lng             double precision not null check (lng between -77.395 and -77.015),
   foto_url        text check (char_length(foto_url) <= 500),
   youtube         text check (char_length(youtube) <= 300),
   estado          text not null default 'pendiente'

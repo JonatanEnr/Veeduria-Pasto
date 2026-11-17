@@ -2,10 +2,10 @@ import '../leaflet-global'
 import 'leaflet.markercluster'
 import 'leaflet.heat'
 import { useEffect, useRef } from 'react'
-import { MapContainer, TileLayer, Marker, ZoomControl, GeoJSON, useMap, useMapEvents } from 'react-leaflet'
+import { MapContainer, TileLayer, Marker, ZoomControl, GeoJSON, CircleMarker, Tooltip, useMap, useMapEvents } from 'react-leaflet'
 import L from 'leaflet'
 import {
-  CENTRO_PASTO, ZOOM_INICIAL, ZOOM_MIN, ZOOM_MAX, LIMITES_PASTO, CAPA_OSM,
+  CENTRO_PASTO, ZOOM_INICIAL, ZOOM_MIN, ZOOM_MAX, LIMITES_NAVEGACION, CAPA_OSM,
 } from '../constants/mapa'
 
 // ---------------- Íconos ----------------
@@ -96,6 +96,7 @@ function CapaCalor({ denuncias }) {
   return null
 }
 
+const estiloMunicipio = { color: '#0f172a', weight: 2.5, opacity: 0.55, fill: false }
 const estiloComuna = { color: '#334155', weight: 1.5, opacity: 0.7, dashArray: '4 4', fillColor: '#0f172a', fillOpacity: 0.03 }
 const etiquetarComuna = (f, capa) =>
   capa.bindTooltip(`C${f.properties.numero}`, { permanent: true, direction: 'center', className: 'etiqueta-comuna' })
@@ -136,7 +137,7 @@ function AjustarTamano({ senal }) {
 }
 
 export default function MapaPasto({
-  denuncias, puntoNuevo, seleccionadaId, objetivo, senalTamano, capas, comunas,
+  denuncias, puntoNuevo, seleccionadaId, objetivo, senalTamano, capas, zonas, corregimientos,
   onClickMapa, onSeleccionar,
 }) {
   return (
@@ -145,16 +146,25 @@ export default function MapaPasto({
       zoom={ZOOM_INICIAL}
       minZoom={ZOOM_MIN}
       maxZoom={ZOOM_MAX}
-      maxBounds={LIMITES_PASTO}
+      maxBounds={LIMITES_NAVEGACION}
       maxBoundsViscosity={0.8}
       zoomControl={false}
     >
       <TileLayer url={CAPA_OSM.url} attribution={CAPA_OSM.atribucion} maxZoom={ZOOM_MAX} />
       <ZoomControl position="topright" />
 
-      {capas.comunas && comunas && (
-        <GeoJSON data={comunas} style={estiloComuna} interactive={false} onEachFeature={etiquetarComuna} />
+      {/* Borde de todo el municipio: siempre visible */}
+      {zonas.municipio && <GeoJSON data={zonas.municipio} style={estiloMunicipio} interactive={false} />}
+
+      {capas.zonas && zonas.comunas && (
+        <GeoJSON data={zonas.comunas} style={estiloComuna} interactive={false} onEachFeature={etiquetarComuna} />
       )}
+      {capas.zonas && corregimientos.map((c) => (
+        <CircleMarker key={c.id} center={[c.lat, c.lng]} radius={4} interactive={false}
+          pathOptions={{ color: '#fff', weight: 1.5, fillColor: '#0f172a', fillOpacity: 0.9 }}>
+          <Tooltip permanent direction="top" offset={[0, -4]} className="etiqueta-corregimiento">{c.nombre}</Tooltip>
+        </CircleMarker>
+      ))}
       {capas.calor && <CapaCalor denuncias={denuncias} />}
 
       <CapturadorClics onClick={onClickMapa} />

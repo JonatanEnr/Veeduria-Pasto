@@ -3,6 +3,12 @@
 --  Ejecutar DESPUÉS de la 02. Es seguro volver a ejecutarlo.
 -- =====================================================================
 
+-- 0) Aceptar denuncias en TODO el municipio (zona urbana + corregimientos) --
+alter table public.denuncias drop constraint if exists denuncias_lat_check;
+alter table public.denuncias drop constraint if exists denuncias_lng_check;
+alter table public.denuncias add constraint denuncias_lat_check check (lat between 0.81 and 1.365);
+alter table public.denuncias add constraint denuncias_lng_check check (lng between -77.395 and -77.015);
+
 -- 1) Nuevas columnas -------------------------------------------------------
 alter table public.denuncias add column if not exists foto_solucion_url text
   check (char_length(foto_solucion_url) <= 500);

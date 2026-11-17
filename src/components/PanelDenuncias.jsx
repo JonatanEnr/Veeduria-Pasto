@@ -3,6 +3,7 @@ import { Insignia, ContadorDias } from './DetalleDenuncia'
 import { SECRETARIAS, obtenerSecretaria, ESTADOS, MODERACION } from '../constants/secretarias'
 import { haceCuanto } from '../utils/fechas'
 import { MOSTRAR_POLITICA } from '../constants/organizacion'
+import { CORREGIMIENTOS } from '../constants/corregimientos'
 
 const PESTANAS = [
   { id: 'mapa', etiqueta: 'Publicadas' },
@@ -52,7 +53,7 @@ export default function PanelDenuncias({
   denuncias, publicadas, conteos, esAdmin, vista, onVista, filtros, onFiltros, onSeleccionar, cargando,
   onEstadisticas, onLegal,
 }) {
-  const filtrosActivos = filtros.texto || filtros.estado || filtros.secretaria || filtros.comuna
+  const filtrosActivos = filtros.texto || filtros.estado || filtros.secretaria || filtros.zona
   const select =
     'w-full min-w-0 rounded-lg border border-slate-300 bg-white px-2.5 py-2 text-sm text-slate-700 focus:border-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-900/10'
 
@@ -66,7 +67,7 @@ export default function PanelDenuncias({
             <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
               <path d="M3 3v18h18M7 16v-3M12 16V8M17 16v-6" />
             </svg>
-            Ranking de entidades y comunas
+            Ranking de entidades y zonas
           </span>
           <span className="text-slate-400">›</span>
         </button>
@@ -109,10 +110,14 @@ export default function PanelDenuncias({
               <option value="">Todas las entidades</option>
               {SECRETARIAS.map((s) => <option key={s.id} value={s.id}>{s.corto}</option>)}
             </select>
-            <select value={filtros.comuna} onChange={(e) => onFiltros({ ...filtros, comuna: e.target.value })} className={select} aria-label="Filtrar por comuna">
-              <option value="">Todas las comunas</option>
-              {Array.from({ length: 12 }, (_, i) => <option key={i + 1} value={String(i + 1)}>Comuna {i + 1}</option>)}
-              <option value="0">Rural / otras</option>
+            <select value={filtros.zona} onChange={(e) => onFiltros({ ...filtros, zona: e.target.value })} className={select} aria-label="Filtrar por comuna o corregimiento">
+              <option value="">Todo el municipio</option>
+              <optgroup label="Comunas (zona urbana)">
+                {Array.from({ length: 12 }, (_, i) => <option key={i + 1} value={`c${i + 1}`}>Comuna {i + 1}</option>)}
+              </optgroup>
+              <optgroup label="Corregimientos (zona rural)">
+                {CORREGIMIENTOS.map((c) => <option key={c.id} value={c.id}>{c.nombre}</option>)}
+              </optgroup>
             </select>
             <select value={filtros.orden} onChange={(e) => onFiltros({ ...filtros, orden: e.target.value })} className={select} aria-label="Ordenar">
               <option value="recientes">Más recientes</option>
@@ -126,7 +131,7 @@ export default function PanelDenuncias({
       <div className="flex items-center justify-between px-4 pb-1 pt-3 text-xs font-medium text-slate-500">
         <span>{denuncias.length} {denuncias.length === 1 ? 'resultado' : 'resultados'}</span>
         {filtrosActivos && (
-          <button type="button" onClick={() => onFiltros({ ...filtros, texto: '', estado: '', secretaria: '', comuna: '' })}
+          <button type="button" onClick={() => onFiltros({ ...filtros, texto: '', estado: '', secretaria: '', zona: '' })}
             className="font-semibold text-slate-700 hover:text-slate-900">
             Limpiar filtros
           </button>

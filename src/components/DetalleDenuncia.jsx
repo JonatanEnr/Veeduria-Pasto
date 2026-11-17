@@ -119,7 +119,11 @@ export default function DetalleDenuncia({
                 <span className="h-2 w-2 rounded-full" style={{ backgroundColor: secretaria.color }} />
                 {secretaria.corto}
               </Insignia>
-              {denuncia.comuna && <Insignia clase="bg-white text-slate-600 ring-slate-200">Comuna {denuncia.comuna}</Insignia>}
+              {denuncia.zona && (
+                <Insignia clase="bg-white text-slate-600 ring-slate-200">
+                  {denuncia.zona.tipo === 'corregimiento' ? `Corr. ${denuncia.zona.nombre}` : denuncia.zona.nombre}
+                </Insignia>
+              )}
             </div>
             <h2 className="text-xl font-bold leading-snug tracking-tight text-slate-900">{denuncia.titulo}</h2>
             <div className="space-y-1 text-sm text-slate-500">

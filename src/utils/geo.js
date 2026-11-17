@@ -24,14 +24,34 @@ function dentroDePoligono(punto, coords) {
   return dentroDeAnillo(punto, exterior) && !huecos.some((h) => dentroDeAnillo(punto, h))
 }
 
-/** Devuelve el número de comuna (1–12) del punto, o null si está fuera. */
-export function comunaDe(lat, lng, comunas) {
-  if (!comunas) return null
+const dentroDeFeature = (p, f) => {
+  const { type, coordinates } = f.geometry
+  const poligonos = type === 'Polygon' ? [coordinates] : coordinates
+  return poligonos.some((c) => dentroDePoligono(p, c))
+}
+
+/** ¿El punto está dentro de alguna figura de la colección GeoJSON? */
+export const dentroDe = (lat, lng, coleccion) =>
+  Boolean(coleccion?.features.some((f) => dentroDeFeature([lng, lat], f)))
+
+/**
+ * Zona del municipio a la que pertenece un punto:
+ *  - dentro de una comuna (polígono oficial) → { tipo: 'comuna', clave: 'c3', nombre: 'Comuna 3' }
+ *  - fuera → corregimiento con la cabecera más cercana (aproximación)
+ */
+export function zonaDe(lat, lng, comunas, corregimientos) {
   const p = [lng, lat]
-  for (const f of comunas.features) {
-    const { type, coordinates } = f.geometry
-    const poligonos = type === 'Polygon' ? [coordinates] : coordinates
-    if (poligonos.some((c) => dentroDePoligono(p, c))) return f.properties.numero
+  const comuna = comunas?.features.find((f) => dentroDeFeature(p, f))
+  if (comuna) {
+    const n = comuna.properties.numero
+    return { tipo: 'comuna', clave: `c${n}`, nombre: `Comuna ${n}`, orden: n }
   }
-  return null
+  if (!comunas || !corregimientos?.length) return null
+  let mejor = null
+  let menor = Infinity
+  for (const c of corregimientos) {
+    const m = distanciaMetros({ lat, lng }, c)
+    if (m < menor) { menor = m; mejor = c }
+  }
+  return { tipo: 'corregimiento', clave: mejor.id, nombre: mejor.nombre, orden: 100 }
 }

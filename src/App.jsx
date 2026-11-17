@@ -10,11 +10,12 @@ import PaginasLegales, { paginaLegalDisponible } from './components/PaginasLegal
 import Icono from './components/Iconos'
 import { useDenuncias } from './hooks/useDenuncias'
 import { useSesion } from './hooks/useSesion'
-import { useComunas } from './hooks/useComunas'
+import { useZonas } from './hooks/useComunas'
 import { exportarJSON, modoNube } from './services/almacenamiento'
 import { errorConfiguracion } from './services/supabase'
-import { LIMITES_PASTO } from './constants/mapa'
-import { comunaDe } from './utils/geo'
+import { LIMITES_MUNICIPIO } from './constants/mapa'
+import { CORREGIMIENTOS } from './constants/corregimientos'
+import { dentroDe, zonaDe } from './utils/geo'
 import { diasDenuncia } from './utils/fechas'
 
 const normalizar = (t = '') => t.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase()
@@ -33,10 +34,12 @@ const ORDENES = {
   apoyos: (a, b) => (b.apoyos ?? 0) - (a.apoyos ?? 0) || b.fechaCreacion.localeCompare(a.fechaCreacion),
 }
 
-const FILTROS_INICIALES = { texto: '', estado: '', secretaria: '', comuna: '', orden: 'recientes' }
+const FILTROS_INICIALES = { texto: '', estado: '', secretaria: '', zona: '', orden: 'recientes' }
 
-const dentroDePasto = (lat, lng) => {
-  const [[s, o], [n, e]] = LIMITES_PASTO
+// Dentro del municipio: polígono oficial si ya cargó; si no, el rectángulo que lo contiene
+const dentroDePasto = (lat, lng, municipio) => {
+  if (municipio) return dentroDe(lat, lng, municipio)
+  const [[s, o], [n, e]] = LIMITES_MUNICIPIO
   return lat >= s && lat <= n && lng >= o && lng <= e
 }
 
@@ -59,7 +62,7 @@ function useEsMovil() {
 
 export default function App() {
   const esMovil = useEsMovil()
-  const comunas = useComunas()
+  const zonas = useZonas()
   const { sesion, esAdmin, ingresar, salir, authDisponible } = useSesion()
   const {
     denuncias: crudas, cargando, error, limpiarError, recargar, apoyadas,
@@ -74,7 +77,7 @@ export default function App() {
   const [mostrarEstadisticas, setMostrarEstadisticas] = useState(false)
   const [paginaLegal, setPaginaLegal] = useState(paginaLegalDelHash)
   const [vista, setVista] = useState('mapa')
-  const [capas, setCapas] = useState({ comunas: false, calor: false })
+  const [capas, setCapas] = useState({ zonas: false, calor: false })
   const [aviso, setAviso] = useState(null) // { tipo: 'exito' | 'info', texto }
   const [ubicando, setUbicando] = useState(false)
   const [filtros, setFiltros] = useState(FILTROS_INICIALES)
@@ -102,8 +105,8 @@ export default function App() {
 
   // ---------------- Datos derivados ----------------
   const denuncias = useMemo(
-    () => crudas.map((d) => ({ ...d, comuna: comunaDe(d.lat, d.lng, comunas) })),
-    [crudas, comunas],
+    () => crudas.map((d) => ({ ...d, zona: zonaDe(d.lat, d.lng, zonas.comunas, CORREGIMIENTOS) })),
+    [crudas, zonas.comunas],
   )
 
   const filtradas = useMemo(() => {
@@ -113,7 +116,7 @@ export default function App() {
         (d) =>
           (!filtros.estado || d.estado === filtros.estado) &&
           (!filtros.secretaria || d.secretaria === filtros.secretaria) &&
-          (!filtros.comuna || String(d.comuna ?? 0) === filtros.comuna) &&
+          (!filtros.zona || d.zona?.clave === filtros.zona) &&
           (!q || normalizar(
             `${d.titulo} ${d.direccion} ${d.barrio} ${d.descripcion} ${d.contacto?.nombre ?? ''} ${d.contacto?.cargo ?? ''}`,
           ).includes(q)),
@@ -176,6 +179,10 @@ export default function App() {
       return
     }
     setSeleccionadaId(null)
+    if (!dentroDePasto(punto.lat, punto.lng, zonas.municipio)) {
+      setAviso({ tipo: 'info', texto: 'Ese punto está fuera del municipio de Pasto. Toca dentro de la línea del borde.' })
+      return
+    }
     setPuntoNuevo(punto)
   }
 
@@ -189,7 +196,7 @@ export default function App() {
       ({ coords }) => {
         setUbicando(false)
         const { latitude: lat, longitude: lng } = coords
-        if (!dentroDePasto(lat, lng)) {
+        if (!dentroDePasto(lat, lng, zonas.municipio)) {
           setAviso({ tipo: 'info', texto: 'Parece que no estás en Pasto. Toca en el mapa el lugar del problema.' })
           return
         }
@@ -248,7 +255,7 @@ export default function App() {
   }
 
   const filtrarDesdeEstadisticas = (cambio) => {
-    setFiltros((f) => ({ ...f, secretaria: '', comuna: '', ...cambio }))
+    setFiltros((f) => ({ ...f, secretaria: '', zona: '', ...cambio }))
     setVista('mapa')
     setSeleccionadaId(null)
     setMostrarEstadisticas(false)
@@ -333,7 +340,8 @@ export default function App() {
             objetivo={objetivo}
             senalTamano={esMovil}
             capas={capas}
-            comunas={comunas}
+            zonas={zonas}
+            corregimientos={CORREGIMIENTOS}
             onClickMapa={clicEnMapa}
             onSeleccionar={seleccionar}
           />
@@ -375,7 +383,7 @@ export default function App() {
             </button>
             <div className="overflow-hidden rounded-xl bg-white shadow-[0_4px_14px_rgb(15_23_42/0.15)]">
               {[
-                { id: 'comunas', titulo: 'Mostrar comunas', texto: 'C' },
+                { id: 'zonas', titulo: 'Mostrar comunas y corregimientos', texto: 'Z' },
                 { id: 'calor', titulo: 'Mapa de calor', texto: '🔥' },
               ].map((c, i) => (
                 <button key={c.id} type="button" title={c.titulo} aria-label={c.titulo} aria-pressed={capas[c.id]}
@@ -478,7 +486,7 @@ export default function App() {
           publicadas={publicadas}
           onCerrar={() => setMostrarEstadisticas(false)}
           onFiltrarSecretaria={(secretaria) => filtrarDesdeEstadisticas({ secretaria })}
-          onFiltrarComuna={(comuna) => filtrarDesdeEstadisticas({ comuna })}
+          onFiltrarZona={(zona) => filtrarDesdeEstadisticas({ zona })}
         />
       )}
 

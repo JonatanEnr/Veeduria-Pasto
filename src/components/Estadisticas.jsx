@@ -15,7 +15,7 @@ function Barra({ pendientes, solucionadas, maximo }) {
   )
 }
 
-export default function Estadisticas({ publicadas, onCerrar, onFiltrarSecretaria, onFiltrarComuna }) {
+export default function Estadisticas({ publicadas, onCerrar, onFiltrarSecretaria, onFiltrarZona }) {
   useEffect(() => {
     const esc = (e) => e.key === 'Escape' && onCerrar()
     window.addEventListener('keydown', esc)
@@ -40,19 +40,25 @@ export default function Estadisticas({ publicadas, onCerrar, onFiltrarSecretaria
       .map((s) => ({ ...s, ...resumen(publicadas.filter((d) => d.secretaria === s.id)) }))
       .filter((s) => s.total > 0)
       .sort((a, b) => b.pendientes - a.pendientes || (b.diasEspera ?? 0) - (a.diasEspera ?? 0))
-    const comunas = new Map()
+    const zonas = new Map()
     for (const d of publicadas) {
-      const k = d.comuna ?? 0
-      comunas.set(k, [...(comunas.get(k) ?? []), d])
+      if (!d.zona) continue
+      const actual = zonas.get(d.zona.clave) ?? { ...d.zona, lista: [] }
+      actual.lista.push(d)
+      zonas.set(d.zona.clave, actual)
     }
-    const porComuna = [...comunas.entries()]
-      .map(([numero, lista]) => ({ numero, ...resumen(lista) }))
+    const porZona = [...zonas.values()]
+      .map(({ lista, ...z }) => ({ ...z, ...resumen(lista) }))
       .sort((a, b) => b.pendientes - a.pendientes || b.total - a.total)
-    return { porEntidad, porComuna, global: resumen(publicadas) }
+    return { porEntidad, porZona, global: resumen(publicadas) }
   }, [publicadas])
 
   const maxEntidad = Math.max(1, ...porEntidad.map((s) => s.total))
-  const maxComuna = Math.max(1, ...porComuna.map((c) => c.total))
+  const maxZona = Math.max(1, ...porZona.map((c) => c.total))
+  const grupos = [
+    { titulo: 'Comunas · zona urbana', lista: porZona.filter((z) => z.tipo === 'comuna') },
+    { titulo: 'Corregimientos · zona rural', lista: porZona.filter((z) => z.tipo === 'corregimiento') },
+  ].filter((g) => g.lista.length)
 
   return (
     <div className="fixed inset-0 z-[1000] flex items-end justify-center bg-slate-900/50 backdrop-blur-[2px] sm:items-center sm:p-4" onClick={onCerrar}>
@@ -124,22 +130,31 @@ export default function Estadisticas({ publicadas, onCerrar, onFiltrarSecretaria
           </section>
 
           <section>
-            <h3 className="mb-1 text-sm font-bold text-slate-900">Por comuna</h3>
-            <p className="mb-3 text-xs text-slate-500">Toca una comuna para filtrar el mapa.</p>
-            <div className="grid gap-2 sm:grid-cols-2">
-              {porComuna.map((c) => (
-                <button key={c.numero} type="button" onClick={() => c.numero && onFiltrarComuna(String(c.numero))}
-                  className="rounded-xl border border-slate-200 p-3 text-left hover:border-slate-300 hover:bg-slate-50">
-                  <div className="mb-1.5 flex items-baseline justify-between">
-                    <span className="text-sm font-semibold text-slate-900">{c.numero ? `Comuna ${c.numero}` : 'Rural / fuera de comunas'}</span>
-                    <span className="text-xs tabular-nums text-slate-500">
-                      <span className="font-semibold text-red-700">{c.pendientes}</span> pend. · {c.total} total
-                    </span>
-                  </div>
-                  <Barra pendientes={c.pendientes} solucionadas={c.solucionadas} maximo={maxComuna} />
-                </button>
-              ))}
-            </div>
+            <h3 className="mb-1 text-sm font-bold text-slate-900">Por comuna y corregimiento</h3>
+            <p className="mb-3 text-xs text-slate-500">Toca una zona para filtrar el mapa.</p>
+            {grupos.length === 0 && <p className="text-sm text-slate-500">Aún no hay datos.</p>}
+            {grupos.map((g) => (
+              <div key={g.titulo} className="mb-4">
+                <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-slate-500">{g.titulo}</p>
+                <div className="grid gap-2 sm:grid-cols-2">
+                  {g.lista.map((z) => (
+                    <button key={z.clave} type="button" onClick={() => onFiltrarZona(z.clave)}
+                      className="rounded-xl border border-slate-200 p-3 text-left hover:border-slate-300 hover:bg-slate-50">
+                      <div className="mb-1.5 flex items-baseline justify-between gap-2">
+                        <span className="truncate text-sm font-semibold text-slate-900">{z.nombre}</span>
+                        <span className="shrink-0 text-xs tabular-nums text-slate-500">
+                          <span className="font-semibold text-red-700">{z.pendientes}</span> pend. · {z.total} total
+                        </span>
+                      </div>
+                      <Barra pendientes={z.pendientes} solucionadas={z.solucionadas} maximo={maxZona} />
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ))}
+            <p className="text-[11px] text-slate-400">
+              Las comunas usan sus límites oficiales. En la zona rural, cada denuncia se asigna al corregimiento con la cabecera más cercana.
+            </p>
           </section>
 
           <p className="flex items-center gap-4 text-xs text-slate-500">
