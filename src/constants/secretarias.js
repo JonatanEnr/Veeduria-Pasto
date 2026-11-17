@@ -18,6 +18,17 @@ export const obtenerSecretaria = (id) =>
   SECRETARIAS.find((s) => s.id === id) ?? SECRETARIAS[SECRETARIAS.length - 1]
 
 export const ESTADOS = {
-  pendiente: { etiqueta: 'Pendiente', clase: 'bg-red-600', texto: 'text-red-700', fondo: 'bg-red-50' },
-  solucionado: { etiqueta: 'Solucionado', clase: 'bg-green-600', texto: 'text-green-700', fondo: 'bg-green-50' },
+  pendiente: {
+    etiqueta: 'Pendiente', clase: 'bg-red-600', texto: 'text-red-700', fondo: 'bg-red-50',
+    insignia: 'bg-red-50 text-red-700 ring-red-600/20',
+  },
+  solucionado: {
+    etiqueta: 'Solucionado', clase: 'bg-emerald-600', texto: 'text-emerald-700', fondo: 'bg-emerald-50',
+    insignia: 'bg-emerald-50 text-emerald-700 ring-emerald-600/20',
+  },
+}
+
+export const MODERACION = {
+  revision: { etiqueta: 'Por revisar', clase: 'bg-amber-500', insignia: 'bg-amber-50 text-amber-800 ring-amber-600/30' },
+  rechazada: { etiqueta: 'Rechazada', clase: 'bg-slate-400', insignia: 'bg-slate-100 text-slate-600 ring-slate-500/20' },
 }

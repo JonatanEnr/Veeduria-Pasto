@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import Icono from './Iconos'
 import { SECRETARIAS } from '../constants/secretarias'
 import { obtenerDireccion } from '../services/geocodificacion'
 import { comprimirImagen } from '../utils/imagen'
@@ -30,7 +31,7 @@ const CARGOS = [
 ]
 
 // Celular colombiano: 10 dígitos empezando por 3 (acepta +57, espacios, guiones)
-export const normalizarCelular = (t) => {
+const normalizarCelular = (t) => {
   let n = t.replace(/\D/g, '')
   if (n.length === 12 && n.startsWith('57')) n = n.slice(2)
   return n
@@ -38,17 +39,50 @@ export const normalizarCelular = (t) => {
 const celularValido = (t) => /^3\d{9}$/.test(normalizarCelular(t))
 
 const campo =
-  'w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200'
+  'w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 focus:border-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-900/10'
+const campoError = 'border-red-400 focus:border-red-500 focus:ring-red-500/10'
+
+function Seccion({ numero, titulo, descripcion, children }) {
+  return (
+    <section className="space-y-3">
+      <div className="flex items-start gap-2.5">
+        <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-slate-900 text-[11px] font-bold text-white">
+          {numero}
+        </span>
+        <div>
+          <h3 className="text-sm font-bold text-slate-900">{titulo}</h3>
+          {descripcion && <p className="text-xs text-slate-500">{descripcion}</p>}
+        </div>
+      </div>
+      <div className="space-y-3 sm:pl-7">{children}</div>
+    </section>
+  )
+}
+
+function Campo({ etiqueta, error, ayuda, children }) {
+  return (
+    <label className="block">
+      <span className="mb-1.5 block text-xs font-semibold text-slate-700">{etiqueta}</span>
+      {children}
+      {error ? (
+        <span className="mt-1 flex items-center gap-1 text-xs text-red-600"><Icono nombre="alerta" className="h-3.5 w-3.5" />{error}</span>
+      ) : ayuda ? (
+        <span className="mt-1 block text-xs text-slate-500">{ayuda}</span>
+      ) : null}
+    </label>
+  )
+}
 
 export default function FormularioDenuncia({ punto, esAdmin, onGuardar, onCancelar }) {
   const [datos, setDatos] = useState(VACIO)
+  const [modo, setModo] = useState(esAdmin ? 'anonima' : 'datos') // 'datos' | 'anonima'
   const [contacto, setContacto] = useState(CONTACTO_VACIO)
   const [buscandoDireccion, setBuscandoDireccion] = useState(true)
   const [procesandoFoto, setProcesandoFoto] = useState(false)
   const [guardando, setGuardando] = useState(false)
   const [errores, setErrores] = useState({})
 
-  // Al hacer clic en una calle, se busca su nombre real en OpenStreetMap
+  // Al tocar una calle, se busca su nombre real en OpenStreetMap
   useEffect(() => {
     let activo = true
     setBuscandoDireccion(true)
@@ -60,6 +94,13 @@ export default function FormularioDenuncia({ punto, esAdmin, onGuardar, onCancel
     return () => { activo = false }
   }, [punto])
 
+  // Cerrar con Escape
+  useEffect(() => {
+    const alPresionar = (e) => { if (e.key === 'Escape' && !guardando) onCancelar() }
+    window.addEventListener('keydown', alPresionar)
+    return () => window.removeEventListener('keydown', alPresionar)
+  }, [guardando, onCancelar])
+
   const cambiar = (e) => setDatos((d) => ({ ...d, [e.target.name]: e.target.value }))
   const cambiarContacto = (e) => {
     const { name, value, type, checked } = e.target
@@ -68,6 +109,7 @@ export default function FormularioDenuncia({ punto, esAdmin, onGuardar, onCancel
 
   const cambiarFoto = async (e) => {
     const archivo = e.target.files?.[0]
+    e.target.value = ''
     if (!archivo) return
     setProcesandoFoto(true)
     try {
@@ -86,14 +128,11 @@ export default function FormularioDenuncia({ punto, esAdmin, onGuardar, onCancel
     if (!datos.titulo.trim()) er.titulo = 'Escribe un título corto'
     if (!datos.secretaria) er.secretaria = 'Selecciona la entidad responsable'
     if (!esLinkYoutubeValido(datos.youtube)) er.youtube = 'El enlace no parece ser de YouTube'
-
-    // El ciudadano debe identificarse; el veedor puede omitirlo
-    const llenoAlgo = contacto.nombre.trim() || contacto.celular.trim() || contacto.cargo.trim()
-    if (!esAdmin || llenoAlgo) {
+    if (modo === 'datos') {
       if (contacto.nombre.trim().length < 3) er.nombre = 'Escribe tu nombre completo'
-      if (!celularValido(contacto.celular)) er.celular = 'Celular de 10 dígitos, ej: 3001234567'
+      if (!celularValido(contacto.celular)) er.celular = '10 dígitos, ej: 300 123 4567'
       if (contacto.cargo.trim().length < 2) er.cargo = 'Indica tu cargo o rol'
-      if (!contacto.autoriza) er.autoriza = 'Debes autorizar el tratamiento de datos para enviar'
+      if (!contacto.autoriza) er.autoriza = 'Debes autorizar el tratamiento de datos'
     }
     setErrores(er)
     return Object.keys(er).length === 0
@@ -101,7 +140,11 @@ export default function FormularioDenuncia({ punto, esAdmin, onGuardar, onCancel
 
   const enviar = async (e) => {
     e.preventDefault()
-    if (guardando || !validar()) return
+    if (guardando) return
+    if (!validar()) {
+      requestAnimationFrame(() => document.querySelector('[data-error="true"]')?.scrollIntoView({ behavior: 'smooth', block: 'center' }))
+      return
+    }
     setGuardando(true)
     try {
       await onGuardar({
@@ -114,7 +157,7 @@ export default function FormularioDenuncia({ punto, esAdmin, onGuardar, onCancel
         estado: esAdmin ? datos.estado : 'pendiente',
         lat: punto.lat,
         lng: punto.lng,
-        contacto: contacto.nombre.trim()
+        contacto: modo === 'datos'
           ? {
               nombre: contacto.nombre.trim(),
               celular: normalizarCelular(contacto.celular),
@@ -129,169 +172,226 @@ export default function FormularioDenuncia({ punto, esAdmin, onGuardar, onCancel
     }
   }
 
-  const secretariaActual = SECRETARIAS.find((s) => s.id === datos.secretaria)
+  const err = (k) => (errores[k] ? { 'data-error': 'true' } : {})
 
   return (
-    <div className="fixed inset-0 z-[1000] flex items-end justify-center bg-black/40 p-0 sm:items-center sm:p-4">
+    <div className="fixed inset-0 z-[1000] flex items-end justify-center bg-slate-900/50 backdrop-blur-[2px] sm:items-center sm:p-4">
       <form
         onSubmit={enviar}
-        className="max-h-[92vh] w-full max-w-lg overflow-y-auto rounded-t-2xl bg-white shadow-2xl sm:rounded-2xl"
+        noValidate
+        className="animar-subir flex h-[100dvh] w-full flex-col bg-white shadow-2xl sm:h-auto sm:max-h-[92vh] sm:max-w-2xl sm:rounded-2xl"
       >
-        <header className="sticky top-0 z-10 flex items-center justify-between border-b bg-white px-5 py-3">
-          <div>
-            <h2 className="text-lg font-bold text-slate-900">Nueva denuncia</h2>
-            <p className="text-xs text-slate-500">
-              {punto.lat.toFixed(5)}, {punto.lng.toFixed(5)}
+        <header className="flex shrink-0 items-start gap-3 border-b border-slate-200 px-4 py-3 sm:px-6 sm:py-4"
+          style={{ paddingTop: 'max(0.75rem, env(safe-area-inset-top))' }}>
+          <div className="min-w-0 flex-1">
+            <h2 className="text-lg font-bold tracking-tight text-slate-900">Nueva denuncia</h2>
+            <p className="mt-0.5 flex items-center gap-1 truncate text-xs text-slate-500">
+              <Icono nombre="pin" className="h-3.5 w-3.5 shrink-0" />
+              {buscandoDireccion ? 'Buscando la dirección…' : datos.direccion || `${punto.lat.toFixed(5)}, ${punto.lng.toFixed(5)}`}
             </p>
           </div>
-          <button type="button" onClick={onCancelar} className="text-2xl leading-none text-slate-400 hover:text-slate-700">
-            ×
+          <button type="button" onClick={onCancelar} aria-label="Cerrar"
+            className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700">
+            <Icono nombre="x" className="h-5 w-5" />
           </button>
         </header>
 
-        <div className="space-y-4 px-5 py-4">
-          <div className="grid gap-3 sm:grid-cols-2">
-            <label className="block">
-              <span className="mb-1 block text-xs font-semibold text-slate-600">Calle / dirección</span>
-              <input name="direccion" value={datos.direccion} onChange={cambiar}
-                placeholder={buscandoDireccion ? 'Buscando calle…' : 'Ej: Calle 18 # 25-30'} className={campo} />
-            </label>
-            <label className="block">
-              <span className="mb-1 block text-xs font-semibold text-slate-600">Barrio / sector</span>
-              <input name="barrio" value={datos.barrio} onChange={cambiar}
-                placeholder={buscandoDireccion ? 'Buscando…' : 'Ej: Las Cuadras'} className={campo} />
-            </label>
-          </div>
+        <div className="desplazable flex-1 space-y-7 overflow-y-auto px-4 py-5 sm:px-6">
+          <Seccion numero="1" titulo="Ubicación" descripcion="La detectamos del mapa; corrígela si hace falta.">
+            <div className="grid gap-3 sm:grid-cols-2">
+              <Campo etiqueta="Calle o dirección">
+                <input name="direccion" value={datos.direccion} onChange={cambiar} maxLength={200}
+                  placeholder={buscandoDireccion ? 'Buscando…' : 'Ej: Calle 18 # 25-30'} className={campo} />
+              </Campo>
+              <Campo etiqueta="Barrio o sector">
+                <input name="barrio" value={datos.barrio} onChange={cambiar} maxLength={120}
+                  placeholder={buscandoDireccion ? 'Buscando…' : 'Ej: Las Cuadras'} className={campo} />
+              </Campo>
+            </div>
+          </Seccion>
 
-          <label className="block">
-            <span className="mb-1 block text-xs font-semibold text-slate-600">Título *</span>
-            <input name="titulo" value={datos.titulo} onChange={cambiar} maxLength={100}
-              placeholder="Ej: Hueco profundo frente al colegio" className={campo} />
-            {errores.titulo && <span className="text-xs text-red-600">{errores.titulo}</span>}
-          </label>
-
-          <label className="block">
-            <span className="mb-1 block text-xs font-semibold text-slate-600">Descripción</span>
-            <textarea name="descripcion" value={datos.descripcion} onChange={cambiar} rows={3}
-              placeholder="¿Qué pasa, desde cuándo, a quién afecta?" className={campo} />
-          </label>
-
-          <label className="block">
-            <span className="mb-1 block text-xs font-semibold text-slate-600">Secretaría / entidad responsable *</span>
-            <select name="secretaria" value={datos.secretaria} onChange={cambiar} className={campo}>
-              <option value="">— Seleccionar —</option>
-              {SECRETARIAS.map((s) => (
-                <option key={s.id} value={s.id}>{s.nombre}</option>
-              ))}
-            </select>
-            {secretariaActual?.ejemplos && (
-              <span className="text-xs text-slate-500">Atiende: {secretariaActual.ejemplos}</span>
-            )}
-            {errores.secretaria && <span className="block text-xs text-red-600">{errores.secretaria}</span>}
-          </label>
-
-          <div>
-            <span className="mb-1 block text-xs font-semibold text-slate-600">Foto de evidencia</span>
-            <label className="flex cursor-pointer items-center justify-center gap-2 rounded-lg border-2 border-dashed border-slate-300 px-3 py-4 text-sm text-slate-500 hover:border-blue-400 hover:bg-blue-50">
-              <input type="file" accept="image/*" capture="environment" onChange={cambiarFoto} className="hidden" />
-              {procesandoFoto ? 'Procesando foto…' : datos.foto ? '📷 Cambiar foto' : '📷 Subir o tomar foto'}
-            </label>
-            {datos.foto && (
-              <div className="relative mt-2">
-                <img src={datos.foto} alt="Vista previa" className="max-h-48 w-full rounded-lg object-cover" />
-                <button type="button" onClick={() => setDatos((d) => ({ ...d, foto: null }))}
-                  className="absolute right-2 top-2 rounded-full bg-black/60 px-2 text-white">×</button>
+          <Seccion numero="2" titulo="¿Qué está pasando?">
+            <div {...err('titulo')}>
+              <Campo etiqueta="Título" error={errores.titulo}>
+                <input name="titulo" value={datos.titulo} onChange={cambiar} maxLength={100}
+                  placeholder="Ej: Hueco profundo frente al colegio" className={`${campo} ${errores.titulo ? campoError : ''}`} />
+              </Campo>
+            </div>
+            <Campo etiqueta="Descripción" ayuda={`${datos.descripcion.length}/2000 · ¿Desde cuándo? ¿A quién afecta?`}>
+              <textarea name="descripcion" value={datos.descripcion} onChange={cambiar} rows={3} maxLength={2000}
+                placeholder="Describe el problema con el mayor detalle posible" className={`${campo} resize-y`} />
+            </Campo>
+            <div {...err('secretaria')}>
+              <span className="mb-1.5 block text-xs font-semibold text-slate-700">Entidad responsable</span>
+              <div className="grid grid-cols-1 gap-2 min-[420px]:grid-cols-2" role="radiogroup">
+                {SECRETARIAS.map((s) => {
+                  const activa = datos.secretaria === s.id
+                  return (
+                    <button key={s.id} type="button" role="radio" aria-checked={activa}
+                      onClick={() => { setDatos((d) => ({ ...d, secretaria: s.id })); setErrores((e) => ({ ...e, secretaria: undefined })) }}
+                      className={`flex items-start gap-2.5 rounded-lg border px-3 py-2 text-left transition ${
+                        activa ? 'border-slate-900 bg-slate-900/[0.03] ring-1 ring-slate-900' : 'border-slate-200 hover:border-slate-300'
+                      }`}>
+                      <span className="mt-1 h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: s.color }} />
+                      <span className="min-w-0">
+                        <span className="block text-sm font-semibold text-slate-900">{s.corto}</span>
+                        {s.ejemplos && <span className="block truncate text-[11px] text-slate-500">{s.ejemplos}</span>}
+                      </span>
+                    </button>
+                  )
+                })}
               </div>
+              {errores.secretaria && (
+                <span className="mt-1 flex items-center gap-1 text-xs text-red-600"><Icono nombre="alerta" className="h-3.5 w-3.5" />{errores.secretaria}</span>
+              )}
+            </div>
+          </Seccion>
+
+          <Seccion numero="3" titulo="Evidencia" descripcion="Opcional, pero ayuda mucho a verificar la denuncia.">
+            {datos.foto ? (
+              <div className="relative overflow-hidden rounded-xl ring-1 ring-slate-200">
+                <img src={datos.foto} alt="Vista previa de la evidencia" className="max-h-64 w-full object-cover" />
+                <div className="absolute right-2 top-2 flex gap-1.5">
+                  <label className="cursor-pointer rounded-lg bg-white/95 px-2.5 py-1.5 text-xs font-semibold text-slate-800 shadow hover:bg-white">
+                    Cambiar
+                    <input type="file" accept="image/*" onChange={cambiarFoto} className="sr-only" />
+                  </label>
+                  <button type="button" onClick={() => setDatos((d) => ({ ...d, foto: null }))} aria-label="Quitar foto"
+                    className="rounded-lg bg-white/95 p-1.5 text-slate-800 shadow hover:bg-white">
+                    <Icono nombre="x" />
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <label className="flex cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed border-slate-300 px-4 py-6 text-center transition hover:border-slate-400 hover:bg-slate-50">
+                <input type="file" accept="image/*" capture="environment" onChange={cambiarFoto} className="sr-only" />
+                <span className="flex h-11 w-11 items-center justify-center rounded-full bg-slate-100 text-slate-600">
+                  <Icono nombre="camara" className="h-5 w-5" />
+                </span>
+                <span className="text-sm font-semibold text-slate-800">{procesandoFoto ? 'Procesando foto…' : 'Tomar o subir una foto'}</span>
+                <span className="text-xs text-slate-500">JPG o PNG · se optimiza automáticamente</span>
+              </label>
             )}
             {errores.foto && <span className="text-xs text-red-600">{errores.foto}</span>}
-          </div>
 
-          <label className="block">
-            <span className="mb-1 block text-xs font-semibold text-slate-600">Link del video en YouTube</span>
-            <input name="youtube" value={datos.youtube} onChange={cambiar} type="url"
-              placeholder="https://youtu.be/…" className={campo} />
-            {errores.youtube && <span className="text-xs text-red-600">{errores.youtube}</span>}
-          </label>
-
-          <fieldset className="space-y-3 rounded-xl border border-slate-200 bg-slate-50 p-3">
-            <legend className="px-1 text-xs font-bold text-slate-700">
-              Tus datos {esAdmin ? '(opcional para el veedor)' : '*'}
-            </legend>
-            <p className="-mt-1 text-[11px] text-slate-500">
-              🔒 No se publican. Solo los ve el veedor para verificar y hacer seguimiento.
-            </p>
-            <label className="block">
-              <span className="mb-1 block text-xs font-semibold text-slate-600">Nombre completo</span>
-              <input name="nombre" value={contacto.nombre} onChange={cambiarContacto} maxLength={80}
-                autoComplete="name" placeholder="Ej: María Fernanda Rosero" className={campo} />
-              {errores.nombre && <span className="text-xs text-red-600">{errores.nombre}</span>}
-            </label>
-            <div className="grid gap-3 sm:grid-cols-2">
-              <label className="block">
-                <span className="mb-1 block text-xs font-semibold text-slate-600">Celular</span>
-                <input name="celular" value={contacto.celular} onChange={cambiarContacto} type="tel"
-                  inputMode="numeric" autoComplete="tel" maxLength={16} placeholder="300 123 4567" className={campo} />
-                {errores.celular && <span className="text-xs text-red-600">{errores.celular}</span>}
-              </label>
-              <label className="block">
-                <span className="mb-1 block text-xs font-semibold text-slate-600">Cargo o rol</span>
-                <input name="cargo" value={contacto.cargo} onChange={cambiarContacto} list="cargos"
-                  maxLength={60} placeholder="Ej: Presidente de JAC" className={campo} />
-                <datalist id="cargos">
-                  {CARGOS.map((c) => <option key={c} value={c} />)}
-                </datalist>
-                {errores.cargo && <span className="text-xs text-red-600">{errores.cargo}</span>}
-              </label>
+            <div {...err('youtube')}>
+              <Campo etiqueta="Video en YouTube" error={errores.youtube}>
+                <div className="relative">
+                  <Icono nombre="video" className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                  <input name="youtube" value={datos.youtube} onChange={cambiar} type="url" inputMode="url"
+                    placeholder="https://youtu.be/…" className={`${campo} pl-9 ${errores.youtube ? campoError : ''}`} />
+                </div>
+              </Campo>
             </div>
-            <label className="flex items-start gap-2 text-[11px] leading-snug text-slate-600">
-              <input type="checkbox" name="autoriza" checked={contacto.autoriza} onChange={cambiarContacto}
-                className="mt-0.5 h-4 w-4 shrink-0" />
-              <span>
-                Autorizo a la Veeduría Ciudadana de Pasto a tratar mis datos personales (nombre, celular y
-                cargo) conforme a la Ley 1581 de 2012, únicamente para verificar esta denuncia y contactarme
-                sobre su seguimiento. Mis datos no serán publicados ni compartidos.
-              </span>
-            </label>
-            {errores.autoriza && <span className="text-xs text-red-600">{errores.autoriza}</span>}
-          </fieldset>
+          </Seccion>
 
-          {!esAdmin && (
-            <p className="rounded-lg bg-blue-50 px-3 py-2 text-xs text-blue-800">
-              ℹ Tu denuncia será revisada por el veedor antes de aparecer en el mapa.
-            </p>
-          )}
-
-          {esAdmin && <fieldset>
-            <span className="mb-1 block text-xs font-semibold text-slate-600">Estado</span>
-            <div className="grid grid-cols-2 gap-2">
+          <Seccion numero="4" titulo="Identificación" descripcion="Tú decides si dejas tus datos.">
+            <div className="grid grid-cols-2 gap-1 rounded-lg bg-slate-100 p-1 text-sm font-semibold" role="radiogroup">
               {[
-                { v: 'pendiente', t: 'Pendiente', on: 'border-red-600 bg-red-50 text-red-700', dot: 'bg-red-600' },
-                { v: 'solucionado', t: 'Solucionado', on: 'border-green-600 bg-green-50 text-green-700', dot: 'bg-green-600' },
+                { id: 'datos', etiqueta: 'Con mis datos', icono: 'usuario' },
+                { id: 'anonima', etiqueta: 'Anónima', icono: 'oculto' },
               ].map((o) => (
-                <button key={o.v} type="button" onClick={() => setDatos((d) => ({ ...d, estado: o.v }))}
-                  className={`flex items-center justify-center gap-2 rounded-lg border-2 py-2 text-sm font-semibold ${
-                    datos.estado === o.v ? o.on : 'border-slate-200 text-slate-500'
+                <button key={o.id} type="button" role="radio" aria-checked={modo === o.id} onClick={() => setModo(o.id)}
+                  className={`inline-flex items-center justify-center gap-1.5 rounded-md px-3 py-2 transition ${
+                    modo === o.id ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-800'
                   }`}>
-                  <span className={`h-2.5 w-2.5 rounded-full ${o.dot}`} /> {o.t}
+                  <Icono nombre={o.icono} /> {o.etiqueta}
                 </button>
               ))}
             </div>
-          </fieldset>}
+
+            {modo === 'datos' ? (
+              <div className="space-y-3">
+                <p className="flex items-start gap-2 rounded-lg bg-emerald-50 px-3 py-2 text-xs text-emerald-900">
+                  <Icono nombre="candado" className="mt-px h-3.5 w-3.5 shrink-0" />
+                  Tus datos <strong className="font-semibold">no se publican</strong>. Solo los ve el veedor para verificar
+                  la denuncia y contarte cómo avanza.
+                </p>
+                <div {...err('nombre')}>
+                  <Campo etiqueta="Nombre completo" error={errores.nombre}>
+                    <input name="nombre" value={contacto.nombre} onChange={cambiarContacto} maxLength={80} autoComplete="name"
+                      placeholder="Ej: María Fernanda Rosero" className={`${campo} ${errores.nombre ? campoError : ''}`} />
+                  </Campo>
+                </div>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <div {...err('celular')}>
+                    <Campo etiqueta="Celular" error={errores.celular}>
+                      <input name="celular" value={contacto.celular} onChange={cambiarContacto} type="tel" inputMode="numeric"
+                        autoComplete="tel" maxLength={16} placeholder="300 123 4567" className={`${campo} ${errores.celular ? campoError : ''}`} />
+                    </Campo>
+                  </div>
+                  <div {...err('cargo')}>
+                    <Campo etiqueta="Cargo o rol" error={errores.cargo}>
+                      <input name="cargo" value={contacto.cargo} onChange={cambiarContacto} list="cargos" maxLength={60}
+                        placeholder="Ej: Presidente de JAC" className={`${campo} ${errores.cargo ? campoError : ''}`} />
+                      <datalist id="cargos">{CARGOS.map((c) => <option key={c} value={c} />)}</datalist>
+                    </Campo>
+                  </div>
+                </div>
+                <label {...err('autoriza')} className={`flex items-start gap-2.5 rounded-lg border p-3 text-xs leading-relaxed text-slate-600 ${
+                  errores.autoriza ? 'border-red-300 bg-red-50' : 'border-slate-200'
+                }`}>
+                  <input type="checkbox" name="autoriza" checked={contacto.autoriza} onChange={cambiarContacto}
+                    className="mt-0.5 h-4 w-4 shrink-0 accent-slate-900" />
+                  <span>
+                    Autorizo a la Veeduría Ciudadana de Pasto a tratar mis datos personales (nombre, celular y cargo)
+                    conforme a la <strong className="font-semibold text-slate-800">Ley 1581 de 2012</strong>, únicamente para
+                    verificar esta denuncia y contactarme sobre su seguimiento. No serán publicados ni compartidos.
+                  </span>
+                </label>
+              </div>
+            ) : (
+              <p className="flex items-start gap-2 rounded-lg bg-slate-100 px-3 py-2.5 text-xs leading-relaxed text-slate-700">
+                <Icono nombre="info" className="mt-px h-3.5 w-3.5 shrink-0" />
+                Se enviará sin ningún dato tuyo. Ten en cuenta que el veedor no podrá contactarte para pedir más
+                detalles, así que describe el problema lo mejor posible.
+              </p>
+            )}
+          </Seccion>
+
+          {esAdmin && (
+            <Seccion numero="5" titulo="Estado inicial" descripcion="Como veedor, tu denuncia se publica de inmediato.">
+              <div className="grid grid-cols-2 gap-2">
+                {[
+                  { v: 'pendiente', t: 'Pendiente', on: 'border-red-600 bg-red-50 text-red-700 ring-1 ring-red-600', dot: 'bg-red-600' },
+                  { v: 'solucionado', t: 'Solucionado', on: 'border-emerald-600 bg-emerald-50 text-emerald-700 ring-1 ring-emerald-600', dot: 'bg-emerald-600' },
+                ].map((o) => (
+                  <button key={o.v} type="button" onClick={() => setDatos((d) => ({ ...d, estado: o.v }))}
+                    className={`flex items-center justify-center gap-2 rounded-lg border py-2.5 text-sm font-semibold ${
+                      datos.estado === o.v ? o.on : 'border-slate-200 text-slate-500'
+                    }`}>
+                    <span className={`h-2 w-2 rounded-full ${o.dot}`} /> {o.t}
+                  </button>
+                ))}
+              </div>
+            </Seccion>
+          )}
 
           {errores.general && (
-            <p className="rounded-lg bg-red-50 px-3 py-2 text-xs text-red-700">{errores.general}</p>
+            <p data-error="true" className="flex items-start gap-2 rounded-lg bg-red-50 px-3 py-2.5 text-sm text-red-700">
+              <Icono nombre="alerta" className="mt-0.5 shrink-0" /> {errores.general}
+            </p>
           )}
         </div>
 
-        <footer className="sticky bottom-0 flex gap-2 border-t bg-white px-5 py-3">
-          <button type="button" onClick={onCancelar}
-            className="flex-1 rounded-lg border border-slate-300 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-50">
-            Cancelar
-          </button>
-          <button type="submit" disabled={procesandoFoto || guardando}
-            className="flex-1 rounded-lg bg-blue-600 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-50">
-            {guardando ? 'Enviando…' : esAdmin ? 'Registrar denuncia' : 'Enviar para revisión'}
-          </button>
+        <footer className="shrink-0 border-t border-slate-200 bg-white px-4 py-3 sm:px-6"
+          style={{ paddingBottom: 'max(0.75rem, env(safe-area-inset-bottom))' }}>
+          {!esAdmin && (
+            <p className="mb-2.5 flex items-center gap-1.5 text-xs text-slate-500">
+              <Icono nombre="escudo" className="h-3.5 w-3.5 shrink-0" />
+              El veedor revisará tu denuncia antes de publicarla en el mapa.
+            </p>
+          )}
+          <div className="flex gap-2">
+            <button type="button" onClick={onCancelar}
+              className="rounded-lg border border-slate-300 px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50">
+              Cancelar
+            </button>
+            <button type="submit" disabled={procesandoFoto || guardando}
+              className="flex-1 rounded-lg bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white hover:bg-slate-800 disabled:opacity-50">
+              {guardando ? 'Enviando…' : esAdmin ? 'Publicar denuncia' : 'Enviar denuncia'}
+            </button>
+          </div>
         </footer>
       </form>
     </div>

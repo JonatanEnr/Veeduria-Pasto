@@ -94,18 +94,30 @@ begin
     v_celular := right(v_celular, 10);
   end if;
 
-  if not v_admin then
-    if not v_contacto then
-      raise exception 'Debes escribir tu nombre, celular y cargo.';
+  -- Con datos: se validan y se limita a 5 por celular al día.
+  -- Anónima (sin nombre): permitida; tope global de 30 anónimas/hora en revisión
+  -- para frenar ataques masivos (la moderación filtra el resto).
+  if v_contacto then
+    if v_celular !~ '^3[0-9]{9}$' then
+      raise exception 'El celular debe tener 10 dígitos y empezar por 3.';
     end if;
-    if (select count(*) from public.denunciantes
+    if coalesce(btrim(p_cargo), '') = '' then
+      raise exception 'Indica tu cargo o rol.';
+    end if;
+    if not coalesce(p_autoriza_datos, false) then
+      raise exception 'Debes autorizar el tratamiento de tus datos personales.';
+    end if;
+    if not v_admin and (select count(*) from public.denunciantes
         where celular = v_celular and created_at > now() - interval '1 day') >= 5 then
       raise exception 'Este celular ya registró 5 denuncias hoy. Intenta mañana.';
     end if;
-  end if;
-
-  if v_contacto and not coalesce(p_autoriza_datos, false) then
-    raise exception 'Debes autorizar el tratamiento de tus datos personales.';
+  elsif not v_admin then
+    if (select count(*) from public.denuncias d
+        where d.created_at > now() - interval '1 hour'
+          and d.moderacion = 'revision'
+          and not exists (select 1 from public.denunciantes x where x.denuncia_id = d.id)) >= 30 then
+      raise exception 'Se recibieron muchas denuncias anónimas en la última hora. Intenta más tarde o envíala con tus datos.';
+    end if;
   end if;
 
   if p_foto_url is not null
