@@ -50,8 +50,10 @@ export function zonaDe(lat, lng, comunas, corregimientos) {
   let mejor = null
   let menor = Infinity
   for (const c of corregimientos) {
-    const m = distanciaMetros({ lat, lng }, c)
-    if (m < menor) { menor = m; mejor = c }
+    for (const [plat, plng] of [[c.lat, c.lng], ...(c.referencias ?? [])]) {
+      const m = distanciaMetros({ lat, lng }, { lat: plat, lng: plng })
+      if (m < menor) { menor = m; mejor = c }
+    }
   }
   return { tipo: 'corregimiento', clave: mejor.id, nombre: mejor.nombre, orden: 100 }
 }
