@@ -487,6 +487,7 @@ export default function App() {
           onCerrar={() => setMostrarEstadisticas(false)}
           onFiltrarSecretaria={(secretaria) => filtrarDesdeEstadisticas({ secretaria })}
           onFiltrarZona={(zona) => filtrarDesdeEstadisticas({ zona })}
+          onSeleccionar={(d) => { setMostrarEstadisticas(false); seleccionar(d) }}
         />
       )}
 
