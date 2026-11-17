@@ -66,7 +66,7 @@ export default function PanelDenuncias({ denuncias, filtros, onFiltros, onSelecc
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-sm font-semibold text-slate-900">{d.titulo}</p>
                   <p className="truncate text-xs text-slate-500">
-                    {[d.direccion, d.barrio].filter(Boolean).join(' · ') || 'Sin dirección'}
+                    {[...new Set([d.direccion, d.barrio].filter(Boolean))].join(' · ') || 'Sin dirección'}
                   </p>
                   <span className="mt-1 inline-block rounded px-1.5 text-[10px] font-medium text-white"
                     style={{ backgroundColor: s.color }}>

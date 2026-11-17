@@ -35,7 +35,7 @@ export default function DetalleDenuncia({ denuncia, esAdmin, onAlternarEstado, o
 
       {(denuncia.direccion || denuncia.barrio) && (
         <p className="!m-0 text-xs text-slate-500">
-          📍 {[denuncia.direccion, denuncia.barrio].filter(Boolean).join(' · ')}
+          📍 {[...new Set([denuncia.direccion, denuncia.barrio].filter(Boolean))].join(' · ')}
         </p>
       )}
 

@@ -22,6 +22,23 @@ npm run build    # genera /dist para publicar
 - Estado **Pendiente (rojo)** / **Solucionado (verde)**, cambiable desde el popup del marcador.
 - Panel lateral con contadores, búsqueda y filtros por estado y entidad.
 - Exportación de todas las denuncias a JSON.
+- Sincronización con **Obsidian**: una nota por denuncia (ver abajo).
+
+## Obsidian
+
+```bash
+npm run obsidian     # o doble clic en "Sincronizar Obsidian.cmd"
+```
+
+Trae las denuncias de Supabase a la bóveda (por defecto `../Mapa Denuncias Pasto/Denuncia`; se cambia con `OBSIDIAN_CARPETA_DENUNCIAS` en `.env.local`):
+
+- Una nota `.md` por denuncia con propiedades filtrables: `estado`, `secretaria`, `barrio`, `fecha`, `location`, `tags` (`#pendiente`, `#solucionado`, `#secretaria/empopasto`…).
+- La foto se descarga a `Denuncia/adjuntos/` y el video de YouTube queda incrustado.
+- Todo lo que escribas debajo de `## Mis notas` se conserva en cada sincronización.
+- Si una denuncia se elimina del mapa, su nota no se borra: queda con `en_mapa: false`.
+- `Denuncias.base` (Obsidian 1.9+): tablas de Pendientes / Solucionadas / Todas. Se crea una sola vez; puedes personalizarla.
+
+Es de una sola vía (mapa → Obsidian): cambiar el estado en la nota no cambia el mapa.
 
 ## Estructura
 ```
