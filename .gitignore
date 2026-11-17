@@ -1,9 +1,13 @@
 node_modules
 dist
 *.local
+.DS_Store
+
+# Variables de entorno con claves (nunca subir). La plantilla sí se sube.
 .env
-.env.*
+.env*
 !.env.example
+
+# Configuración local de plataformas de despliegue
 .vercel
 .netlify
-.DS_Store
