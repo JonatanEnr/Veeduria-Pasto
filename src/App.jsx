@@ -7,6 +7,7 @@ import ModalIngreso from './components/ModalIngreso'
 import { useDenuncias } from './hooks/useDenuncias'
 import { useSesion } from './hooks/useSesion'
 import { exportarJSON, modoNube } from './services/almacenamiento'
+import { errorConfiguracion } from './services/supabase'
 
 const normalizar = (t = '') => t.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase()
 
@@ -55,6 +56,13 @@ export default function App() {
         onIngresar={() => setMostrarIngreso(true)}
         onSalir={salir}
       />
+
+      {errorConfiguracion && (
+        <div className="bg-amber-100 px-4 py-2 text-center text-xs text-amber-900">
+          ⚠ <strong>Configuración de Supabase incorrecta.</strong> {errorConfiguracion} La app está
+          funcionando en modo local: las denuncias NO se guardan en la nube.
+        </div>
+      )}
 
       {error && (
         <div className="flex items-center justify-center gap-3 bg-red-100 px-4 py-1.5 text-xs text-red-800">
