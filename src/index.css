@@ -109,6 +109,49 @@ body {
   50% { transform: rotate(-45deg) scale(1.18); }
 }
 
+/* ---------------- Grupos de marcadores ---------------- */
+.grupo-denuncias {
+  background: transparent;
+  border: none;
+}
+.grupo-denuncias .grupo {
+  border-radius: 9999px;
+  padding: 4px;
+  background: conic-gradient(#059669 0 var(--pct), #dc2626 var(--pct) 100%);
+  box-shadow: 0 4px 12px rgb(15 23 42 / 0.3);
+  transition: transform 0.15s ease;
+}
+.grupo-denuncias:hover .grupo {
+  transform: scale(1.08);
+}
+.grupo-denuncias .grupo span {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 100%;
+  border-radius: 9999px;
+  background: #fff;
+  color: #0f172a;
+  font-weight: 700;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Etiquetas de comunas */
+.leaflet-tooltip.etiqueta-comuna {
+  background: rgb(15 23 42 / 0.75);
+  border: none;
+  border-radius: 6px;
+  box-shadow: none;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 2px 6px;
+}
+.leaflet-tooltip.etiqueta-comuna::before {
+  display: none;
+}
+
 /* ---------------- Animaciones de interfaz ---------------- */
 @keyframes subir {
   from { transform: translateY(16px); opacity: 0; }

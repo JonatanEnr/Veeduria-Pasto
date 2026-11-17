@@ -8,6 +8,9 @@ dist
 .env*
 !.env.example
 
+# Copias de seguridad: contienen DATOS PERSONALES (nunca subir)
+respaldos/
+
 # Configuración local de plataformas de despliegue
 .vercel
 .netlify

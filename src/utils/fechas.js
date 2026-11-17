@@ -18,5 +18,17 @@ export function haceCuanto(iso) {
   return 'hace un momento'
 }
 
+/** Días completos entre dos fechas (hasta = ahora si se omite). */
+export const diasEntre = (desde, hasta) =>
+  Math.max(0, Math.floor(((hasta ? new Date(hasta) : new Date()).getTime() - new Date(desde).getTime()) / 86400000))
+
+/** Días que lleva abierta (pendiente) o lo que tardó en resolverse. */
+export const diasDenuncia = (d) => diasEntre(d.fechaCreacion, d.estado === 'solucionado' ? d.fechaSolucion : null)
+
+export const textoDias = (n) => (n === 1 ? '1 día' : `${n} días`)
+
+export const fechaCorta = (iso) =>
+  new Date(iso).toLocaleDateString('es-CO', { day: 'numeric', month: 'short', year: 'numeric' })
+
 export const fechaLarga = (iso) =>
   new Date(iso).toLocaleString('es-CO', { dateStyle: 'long', timeStyle: 'short' })

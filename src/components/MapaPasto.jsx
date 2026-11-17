@@ -1,11 +1,14 @@
-import { useEffect } from 'react'
-import { MapContainer, TileLayer, Marker, ZoomControl, useMap, useMapEvents } from 'react-leaflet'
+import '../leaflet-global'
+import 'leaflet.markercluster'
+import 'leaflet.heat'
+import { useEffect, useRef } from 'react'
+import { MapContainer, TileLayer, Marker, ZoomControl, GeoJSON, useMap, useMapEvents } from 'react-leaflet'
 import L from 'leaflet'
 import {
   CENTRO_PASTO, ZOOM_INICIAL, ZOOM_MIN, ZOOM_MAX, LIMITES_PASTO, CAPA_OSM,
 } from '../constants/mapa'
 
-// Íconos con CSS (evita el problema de rutas de imágenes de Leaflet con Vite)
+// ---------------- Íconos ----------------
 const cache = new Map()
 function icono(tipo, activo = false) {
   const clave = `${tipo}:${activo}`
@@ -24,6 +27,80 @@ function icono(tipo, activo = false) {
 const tipoDe = (d) =>
   d.moderacion === 'revision' || d.moderacion === 'rechazada' ? d.moderacion : d.estado
 
+// Grupo: anillo rojo/verde según la proporción pendiente/solucionado
+function iconoGrupo(grupo) {
+  const hijos = grupo.getAllChildMarkers()
+  const n = hijos.length
+  const resueltas = hijos.filter((m) => m.options.tipo === 'solucionado').length
+  const pct = Math.round((resueltas / n) * 100)
+  const tam = n < 10 ? 38 : n < 50 ? 44 : 52
+  return L.divIcon({
+    className: 'grupo-denuncias',
+    html: `<div class="grupo" style="--pct:${pct}%;width:${tam}px;height:${tam}px"><span>${n}</span></div>`,
+    iconSize: [tam, tam],
+  })
+}
+
+// ---------------- Capas ----------------
+function CapaDenuncias({ denuncias, seleccionadaId, onSeleccionar }) {
+  const mapa = useMap()
+  const grupo = useRef(null)
+  const alSeleccionar = useRef(onSeleccionar)
+  alSeleccionar.current = onSeleccionar
+
+  useEffect(() => {
+    const g = L.markerClusterGroup({
+      showCoverageOnHover: false,
+      maxClusterRadius: 45,
+      disableClusteringAtZoom: 17,
+      spiderfyOnMaxZoom: true,
+      iconCreateFunction: iconoGrupo,
+    })
+    mapa.addLayer(g)
+    grupo.current = g
+    return () => { mapa.removeLayer(g) }
+  }, [mapa])
+
+  useEffect(() => {
+    const g = grupo.current
+    if (!g) return
+    g.clearLayers()
+    g.addLayers(denuncias.map((d) => {
+      const activo = d.id === seleccionadaId
+      const m = L.marker([d.lat, d.lng], {
+        icon: icono(tipoDe(d), activo),
+        zIndexOffset: activo ? 1000 : 0,
+        title: d.titulo,
+        tipo: tipoDe(d),
+        keyboard: true,
+      })
+      m.on('click', () => alSeleccionar.current(d))
+      return m
+    }))
+  }, [denuncias, seleccionadaId])
+
+  return null
+}
+
+function CapaCalor({ denuncias }) {
+  const mapa = useMap()
+  useEffect(() => {
+    const puntos = denuncias.map((d) => [d.lat, d.lng, d.estado === 'pendiente' ? 1 : 0.35])
+    const capa = L.heatLayer(puntos, {
+      radius: 28, blur: 22, maxZoom: 17, minOpacity: 0.35,
+      gradient: { 0.2: '#fde68a', 0.45: '#f59e0b', 0.7: '#ef4444', 1: '#991b1b' },
+    })
+    capa.addTo(mapa)
+    return () => { mapa.removeLayer(capa) }
+  }, [denuncias, mapa])
+  return null
+}
+
+const estiloComuna = { color: '#334155', weight: 1.5, opacity: 0.7, dashArray: '4 4', fillColor: '#0f172a', fillOpacity: 0.03 }
+const etiquetarComuna = (f, capa) =>
+  capa.bindTooltip(`C${f.properties.numero}`, { permanent: true, direction: 'center', className: 'etiqueta-comuna' })
+
+// ---------------- Utilidades del mapa ----------------
 function CapturadorClics({ onClick }) {
   useMapEvents({
     click: (e) => onClick({ lat: e.latlng.lat, lng: e.latlng.lng }),
@@ -49,7 +126,6 @@ function Volar({ objetivo }) {
   return null
 }
 
-// Recalcula el tamaño cuando cambia el diseño (p. ej. al abrir/cerrar paneles)
 function AjustarTamano({ senal }) {
   const mapa = useMap()
   useEffect(() => {
@@ -60,7 +136,8 @@ function AjustarTamano({ senal }) {
 }
 
 export default function MapaPasto({
-  denuncias, puntoNuevo, seleccionadaId, objetivo, senalTamano, onClickMapa, onSeleccionar,
+  denuncias, puntoNuevo, seleccionadaId, objetivo, senalTamano, capas, comunas,
+  onClickMapa, onSeleccionar,
 }) {
   return (
     <MapContainer
@@ -75,20 +152,18 @@ export default function MapaPasto({
       <TileLayer url={CAPA_OSM.url} attribution={CAPA_OSM.atribucion} maxZoom={ZOOM_MAX} />
       <ZoomControl position="topright" />
 
+      {capas.comunas && comunas && (
+        <GeoJSON data={comunas} style={estiloComuna} interactive={false} onEachFeature={etiquetarComuna} />
+      )}
+      {capas.calor && <CapaCalor denuncias={denuncias} />}
+
       <CapturadorClics onClick={onClickMapa} />
       <Volar objetivo={objetivo} />
       <AjustarTamano senal={senalTamano} />
 
-      {denuncias.map((d) => (
-        <Marker
-          key={d.id}
-          position={[d.lat, d.lng]}
-          icon={icono(tipoDe(d), d.id === seleccionadaId)}
-          zIndexOffset={d.id === seleccionadaId ? 1000 : 0}
-          eventHandlers={{ click: () => onSeleccionar(d) }}
-          title={d.titulo}
-        />
-      ))}
+      {!capas.calor && (
+        <CapaDenuncias denuncias={denuncias} seleccionadaId={seleccionadaId} onSeleccionar={onSeleccionar} />
+      )}
 
       {puntoNuevo && <Marker position={[puntoNuevo.lat, puntoNuevo.lng]} icon={icono('nuevo')} zIndexOffset={2000} />}
     </MapContainer>

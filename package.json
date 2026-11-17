@@ -8,11 +8,15 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "obsidian": "node --env-file=.env.local scripts/sincronizar-obsidian.mjs"
+    "obsidian": "node --env-file=.env.local scripts/sincronizar-obsidian.mjs",
+    "respaldo": "node --env-file=.env.local scripts/respaldo.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "2.50.0",
+    "@vercel/analytics": "1.5.0",
     "leaflet": "1.9.4",
+    "leaflet.heat": "0.2.0",
+    "leaflet.markercluster": "1.5.3",
     "react": "18.3.1",
     "react-dom": "18.3.1",
     "react-leaflet": "4.2.1"

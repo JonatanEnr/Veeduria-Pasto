@@ -1,110 +1,112 @@
-# Mapa de Denuncias · Veeduría San Juan de Pasto
+# Mapa de Denuncias · Veeduría Ciudadana de Pasto
 
-Aplicación web para registrar y hacer seguimiento a denuncias ciudadanas sobre el mapa real de Pasto (OpenStreetMap), centrado en `1.2136, -77.2811`.
+Aplicación web para registrar, moderar y hacer seguimiento público a denuncias ciudadanas sobre el mapa real de San Juan de Pasto (OpenStreetMap).
 
 ## Stack
-- **Vite 6** + **React 18**
-- **Tailwind CSS 4** (plugin `@tailwindcss/vite`)
-- **Leaflet 1.9** + **react-leaflet 4** con teselas de OpenStreetMap
-- Geocodificación inversa con **Nominatim** (nombre real de la calle y barrio al hacer clic)
+- **Vite 6** + **React 18** + **Tailwind CSS 4**
+- **Leaflet 1.9** + react-leaflet 4, con agrupación de puntos (`leaflet.markercluster`) y mapa de calor (`leaflet.heat`)
+- **Supabase** (Postgres + Storage + Auth) con seguridad por filas (RLS)
+- **Vercel** (sitio + funciones en `/api`) y Vercel Web Analytics
+- Geocodificación inversa con **Nominatim**; límites de comunas de **OpenStreetMap** (ODbL)
 
 ## Uso
 ```bash
 npm install
-npm run dev      # http://localhost:5173
-npm run build    # genera /dist para publicar
+npm run dev        # http://localhost:5173
+npm run build      # genera /dist
+npm run obsidian   # trae las denuncias a la bóveda de Obsidian
+npm run respaldo   # copia de seguridad completa (datos + fotos)
 ```
 
 ## Funcionalidades
-- Clic sobre cualquier calle → formulario con dirección y barrio autocompletados.
-- Asignación de secretaría/entidad responsable (Infraestructura, Empopasto, Tránsito, Gestión Ambiental, EMAS, etc.).
-- Foto de evidencia (se comprime automáticamente a ~1280 px) y link de YouTube (con miniatura).
-- Estado **Pendiente (rojo)** / **Solucionado (verde)**, cambiable desde el popup del marcador.
-- Panel lateral con contadores, búsqueda y filtros por estado y entidad.
-- Exportación de todas las denuncias a JSON.
-- Sincronización con **Obsidian**: una nota por denuncia (ver abajo).
+
+**Ciudadanos**
+- Tocar una calle (o «Denunciar aquí» con el GPS) → formulario con dirección y barrio automáticos.
+- Denuncia **con datos** (nombre, celular, cargo + autorización Ley 1581) o **anónima**.
+- Foto (se comprime y se le quitan los metadatos/GPS) y enlace de YouTube.
+- Aviso de **posibles duplicados** a menos de 60 m, con opción de apoyar la existente.
+- **«Yo también lo veo»**: un apoyo por dispositivo en denuncias pendientes.
+- **Días sin solución**, **antes / después**, **línea de tiempo de seguimiento**.
+- **Compartir** cada denuncia: `/d/<id>` muestra vista previa con foto en redes.
+- **Ranking de entidades y comunas** (días promedio para resolver, pendientes…).
+- Capas de **comunas** y **mapa de calor**; filtros por estado, entidad, comuna y orden.
+- Páginas de **Política de datos** (`#privacidad`) y **Criterios de moderación** (`#criterios`).
+
+**Veedor (con sesión)**
+- Moderación: Por revisar → Aprobar / Rechazar / Ocultar.
+- Ver contacto privado del denunciante (WhatsApp / llamar).
+- Marcar solucionado con **foto del después**; reabrir.
+- Registrar **seguimiento**: radicado, respuesta, visita, nota (es público).
+- Exportar JSON, sincronizar con Obsidian, respaldo completo.
+
+## Base de datos (Supabase)
+
+Ejecutar en **SQL Editor**, en orden y una sola vez cada uno:
+
+| Archivo | Qué hace |
+|---|---|
+| `supabase/esquema.sql` | Tabla de denuncias, administradores, RLS, bucket de fotos |
+| `supabase/02-moderacion-y-denunciantes.sql` | Moderación, datos privados del denunciante, denuncia anónima |
+| `supabase/03-seguimiento-apoyos-solucion.sql` | Seguimiento, apoyos, foto del después |
+| `supabase/04-activar-captcha.sql` | **Solo** al activar el captcha (ver abajo) |
+
+Volverte administrador (tras crear tu usuario en *Authentication → Users*):
+```sql
+insert into public.administradores (user_id)
+select id from auth.users where email = 'TU_CORREO@ejemplo.com';
+```
+
+**Permisos que aplica la base de datos**
+
+| | Público | Veedor |
+|---|---|---|
+| Ver denuncias aprobadas, fotos y seguimiento | ✅ | ✅ |
+| Registrar denuncia (entra *en revisión*) | ✅ | ✅ (se publica directo) |
+| Apoyar una denuncia | ✅ | ✅ |
+| Ver denuncias en revisión / rechazadas | ❌ | ✅ |
+| Ver nombre, celular y cargo del denunciante | ❌ | ✅ |
+| Moderar, cambiar estado, seguimiento, eliminar | ❌ | ✅ |
+
+## Variables de entorno
+
+Ver `.env.example`. En local van en `.env.local`; en Vercel en *Settings → Environment Variables* (hay que **volver a desplegar** tras cambiarlas).
+
+| Variable | Dónde se usa | ¿Secreta? |
+|---|---|---|
+| `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY` | Navegador y `/api` | No (pública por diseño) |
+| `VITE_TURNSTILE_SITE_KEY` | Navegador (captcha) | No |
+| `SUPABASE_SERVICE_ROLE_KEY` | `/api/denunciar`, `npm run respaldo` | **Sí** |
+| `TURNSTILE_SECRET_KEY` | `/api/denunciar` | **Sí** |
+| `WEBHOOK_SECRET`, `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID` | `/api/notificar` | **Sí** |
+
+⚠ Nunca pongas una clave secreta con prefijo `VITE_`: Vite la incrustaría en la página pública.
+
+## Activar servicios opcionales
+
+### Captcha (Cloudflare Turnstile, gratis)
+1. https://dash.cloudflare.com → **Turnstile** → *Add widget* → dominio `veeduria-pasto.vercel.app` (y tu dominio propio si lo tienes) → modo *Managed*.
+2. En Vercel agrega `VITE_TURNSTILE_SITE_KEY`, `TURNSTILE_SECRET_KEY` y `SUPABASE_SERVICE_ROLE_KEY` → **Redeploy**.
+3. Comprueba que el formulario muestra la verificación y que una denuncia de prueba llega.
+4. Solo entonces ejecuta `supabase/04-activar-captcha.sql` (cierra la puerta directa a la base de datos).
+
+### Avisos por Telegram al llegar una denuncia
+1. En Telegram habla con **@BotFather** → `/newbot` → copia el *token*.
+2. Escríbele cualquier mensaje a tu bot y abre `https://api.telegram.org/bot<TOKEN>/getUpdates`: el número en `"chat":{"id": …}` es tu `TELEGRAM_CHAT_ID`.
+3. Inventa una contraseña larga para `WEBHOOK_SECRET`.
+4. En Vercel agrega las tres variables → **Redeploy**.
+5. En Supabase: **Database → Webhooks → Create a new hook**: tabla `denuncias`, evento `Insert`, tipo *HTTP Request*, `POST` a `https://veeduria-pasto.vercel.app/api/notificar`, cabecera `x-webhook-secret: <tu WEBHOOK_SECRET>`.
+
+### Estadísticas de visitas
+Vercel → proyecto → **Analytics** → *Enable*. El código ya está incluido.
+
+### Dominio propio
+Compra el dominio (p. ej. en un registrador `.co`) → Vercel → **Settings → Domains → Add** → sigue las instrucciones de DNS. Luego actualízalo en Supabase (*Authentication → URL Configuration*) y en Turnstile.
+
+## Copias de seguridad
+`npm run respaldo` (o doble clic en `Respaldo.cmd`) guarda en `respaldos/AAAA-MM-DD/` todas las tablas (incluidos datos personales y denuncias no publicadas) y descarga las fotos a `respaldos/fotos/`. Requiere `SUPABASE_SERVICE_ROLE_KEY` en `.env.local`. **Hazlo cada semana** y guarda una copia fuera del PC. La carpeta está excluida de git.
 
 ## Obsidian
+`npm run obsidian` (o `Sincronizar Obsidian.cmd`) crea una nota por denuncia **publicada** en `../Mapa Denuncias Pasto/Denuncia` (configurable con `OBSIDIAN_CARPETA_DENUNCIAS`). Conserva lo escrito bajo `## Mis notas`; descarga la foto; marca `en_mapa: false` si una denuncia sale del mapa. Es de una sola vía (mapa → Obsidian).
 
-```bash
-npm run obsidian     # o doble clic en "Sincronizar Obsidian.cmd"
-```
-
-Trae las denuncias de Supabase a la bóveda (por defecto `../Mapa Denuncias Pasto/Denuncia`; se cambia con `OBSIDIAN_CARPETA_DENUNCIAS` en `.env.local`):
-
-- Una nota `.md` por denuncia con propiedades filtrables: `estado`, `secretaria`, `barrio`, `fecha`, `location`, `tags` (`#pendiente`, `#solucionado`, `#secretaria/empopasto`…).
-- La foto se descarga a `Denuncia/adjuntos/` y el video de YouTube queda incrustado.
-- Todo lo que escribas debajo de `## Mis notas` se conserva en cada sincronización.
-- Si una denuncia se elimina del mapa, su nota no se borra: queda con `en_mapa: false`.
-- `Denuncias.base` (Obsidian 1.9+): tablas de Pendientes / Solucionadas / Todas. Se crea una sola vez; puedes personalizarla.
-
-Es de una sola vía (mapa → Obsidian): cambiar el estado en la nota no cambia el mapa.
-
-## Estructura
-```
-src/
-├── App.jsx                     # Orquesta mapa, panel y formulario
-├── main.jsx
-├── index.css                   # Tailwind + estilos de Leaflet/marcadores
-├── constants/
-│   ├── mapa.js                 # Centro, zoom, límites y capa OSM
-│   └── secretarias.js          # Entidades responsables y estados
-├── components/
-│   ├── Encabezado.jsx
-│   ├── MapaPasto.jsx           # MapContainer, clics y marcadores
-│   ├── DetalleDenuncia.jsx     # Contenido del popup
-│   ├── FormularioDenuncia.jsx  # Registro de denuncia
-│   └── PanelDenuncias.jsx      # Lista, contadores y filtros
-├── hooks/useDenuncias.js       # Estado + CRUD
-├── services/
-│   ├── almacenamiento.js       # Persistencia (localStorage por ahora)
-│   └── geocodificacion.js      # Nominatim
-└── utils/
-    ├── imagen.js               # Compresión de fotos
-    └── youtube.js              # Parseo de enlaces de YouTube
-```
-
-## Base de datos en la nube (Supabase, plan gratuito)
-
-Sin variables de entorno la app funciona en **modo local** (localStorage). Con ellas, guarda todo en Supabase.
-
-**Permisos**
-| Acción | Público | Veedor (con sesión) |
-|---|---|---|
-| Ver denuncias y fotos | ✅ | ✅ |
-| Registrar denuncia (entra como *Pendiente*) | ✅ | ✅ |
-| Cambiar estado / eliminar | ❌ | ✅ |
-
-La base de datos aplica estas reglas (RLS en `supabase/esquema.sql`), no solo la interfaz.
-
-**Pasos**
-1. Crea un proyecto en https://supabase.com (región sugerida: *East US* o *São Paulo*).
-2. **SQL Editor → New query**: pega el contenido de `supabase/esquema.sql` → **Run**.
-3. **Authentication → Users → Add user → Create new user**: tu correo y contraseña (marca *Auto Confirm User*).
-4. En el SQL Editor, vuélvete administrador:
-   ```sql
-   insert into public.administradores (user_id)
-   select id from auth.users where email = 'TU_CORREO@ejemplo.com';
-   ```
-5. *(Recomendado)* **Authentication → Sign In / Providers → Email**: desactiva *Allow new users to sign up*.
-6. **Project Settings → API** (o el botón *Connect*): copia *Project URL* y la clave *anon / publishable* en `.env.local`:
-   ```
-   VITE_SUPABASE_URL=https://xxxx.supabase.co
-   VITE_SUPABASE_ANON_KEY=eyJ...
-   ```
-   ⚠ Nunca uses la clave `service_role` / `secret` en este proyecto.
-7. Reinicia `npm run dev`. El encabezado mostrará **☁ En la nube**.
-
-> El plan gratuito pausa el proyecto tras ~7 días **sin actividad**; se reactiva desde el panel de Supabase.
-
-## Publicar gratis
-
-El código debe estar en un repositorio de GitHub (el `.env.local` **no** se sube; está en `.gitignore`).
-
-**Vercel**: *Add New → Project* → importa el repositorio → *Framework: Vite* (autodetectado) → en *Environment Variables* agrega `VITE_SUPABASE_URL` y `VITE_SUPABASE_ANON_KEY` → *Deploy*.
-
-**Netlify**: *Add new site → Import an existing project* → elige el repositorio (usa `netlify.toml`) → *Site configuration → Environment variables* → agrega las dos variables → *Deploy*.
-
-Tras publicar, agrega la URL del sitio en Supabase → **Authentication → URL Configuration → Site URL**.
-
-Si cambias una variable de entorno en Vercel/Netlify, hay que **volver a desplegar** (Vite las incrusta al compilar).
+## Datos de la organización
+Completa `responsable` y `correo` en `src/constants/organizacion.js`: aparecen en la Política de tratamiento de datos que exige la Ley 1581 de 2012.

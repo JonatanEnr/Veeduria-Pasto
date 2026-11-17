@@ -1,6 +1,10 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import Icono from './Iconos'
-import { SECRETARIAS } from '../constants/secretarias'
+import Captcha from './Captcha'
+import { SECRETARIAS, obtenerSecretaria } from '../constants/secretarias'
+import { CAPTCHA_SITE_KEY } from '../services/almacenamiento'
+import { distanciaMetros } from '../utils/geo'
+import { diasDenuncia, textoDias } from '../utils/fechas'
 import { obtenerDireccion } from '../services/geocodificacion'
 import { comprimirImagen } from '../utils/imagen'
 import { esLinkYoutubeValido } from '../utils/youtube'
@@ -73,8 +77,22 @@ function Campo({ etiqueta, error, ayuda, children }) {
   )
 }
 
-export default function FormularioDenuncia({ punto, esAdmin, onGuardar, onCancelar }) {
+const RADIO_DUPLICADOS = 60 // metros
+
+export default function FormularioDenuncia({
+  punto, esAdmin, publicadas = [], onGuardar, onCancelar, onVerExistente, onLegal,
+}) {
   const [datos, setDatos] = useState(VACIO)
+  const [tokenCaptcha, setTokenCaptcha] = useState(null)
+  const usaCaptcha = Boolean(CAPTCHA_SITE_KEY) && !esAdmin
+
+  // Denuncias pendientes muy cerca: probablemente el mismo problema
+  const cercanas = useMemo(() => publicadas
+    .filter((d) => d.estado === 'pendiente')
+    .map((d) => ({ d, m: distanciaMetros(punto, d) }))
+    .filter(({ m }) => m <= RADIO_DUPLICADOS)
+    .sort((a, b) => a.m - b.m)
+    .slice(0, 3), [publicadas, punto])
   const [modo, setModo] = useState(esAdmin ? 'anonima' : 'datos') // 'datos' | 'anonima'
   const [contacto, setContacto] = useState(CONTACTO_VACIO)
   const [buscandoDireccion, setBuscandoDireccion] = useState(true)
@@ -134,6 +152,7 @@ export default function FormularioDenuncia({ punto, esAdmin, onGuardar, onCancel
       if (contacto.cargo.trim().length < 2) er.cargo = 'Indica tu cargo o rol'
       if (!contacto.autoriza) er.autoriza = 'Debes autorizar el tratamiento de datos'
     }
+    if (usaCaptcha && !tokenCaptcha) er.captcha = 'Completa la verificación «No soy un robot»'
     setErrores(er)
     return Object.keys(er).length === 0
   }
@@ -165,7 +184,7 @@ export default function FormularioDenuncia({ punto, esAdmin, onGuardar, onCancel
               autoriza: contacto.autoriza,
             }
           : null,
-      })
+      }, tokenCaptcha)
     } catch (err) {
       setErrores({ general: err.message })
       setGuardando(false)
@@ -209,6 +228,36 @@ export default function FormularioDenuncia({ punto, esAdmin, onGuardar, onCancel
               </Campo>
             </div>
           </Seccion>
+
+          {cercanas.length > 0 && (
+            <section className="rounded-xl border border-amber-200 bg-amber-50 p-3">
+              <p className="flex items-center gap-1.5 text-sm font-bold text-amber-900">
+                <Icono nombre="info" /> ¿Es alguno de estos? Ya fueron reportados muy cerca
+              </p>
+              <p className="mb-2 text-xs text-amber-800">
+                Si es el mismo problema, apóyalo con «Yo también lo veo»: una denuncia con muchos vecinos pesa más.
+              </p>
+              <ul className="space-y-1.5">
+                {cercanas.map(({ d, m }) => (
+                  <li key={d.id}>
+                    <button type="button" onClick={() => onVerExistente(d)}
+                      className="flex w-full items-center gap-2.5 rounded-lg bg-white p-2 text-left ring-1 ring-amber-200 hover:ring-amber-400">
+                      {d.foto
+                        ? <img src={d.foto} alt="" className="h-10 w-10 shrink-0 rounded-md object-cover" />
+                        : <span className="h-10 w-10 shrink-0 rounded-md bg-slate-100" />}
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate text-sm font-semibold text-slate-900">{d.titulo}</span>
+                        <span className="block truncate text-xs text-slate-500">
+                          a {Math.round(m)} m · {obtenerSecretaria(d.secretaria).corto} · {textoDias(diasDenuncia(d))} sin solución
+                        </span>
+                      </span>
+                      <span className="shrink-0 text-xs font-semibold text-slate-700">Ver ›</span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )}
 
           <Seccion numero="2" titulo="¿Qué está pasando?">
             <div {...err('titulo')}>
@@ -336,7 +385,10 @@ export default function FormularioDenuncia({ punto, esAdmin, onGuardar, onCancel
                   <span>
                     Autorizo a la Veeduría Ciudadana de Pasto a tratar mis datos personales (nombre, celular y cargo)
                     conforme a la <strong className="font-semibold text-slate-800">Ley 1581 de 2012</strong>, únicamente para
-                    verificar esta denuncia y contactarme sobre su seguimiento. No serán publicados ni compartidos.
+                    verificar esta denuncia y contactarme sobre su seguimiento. No serán publicados ni compartidos.{' '}
+                    <button type="button" onClick={() => onLegal('privacidad')} className="font-semibold text-slate-900 underline">
+                      Leer la política
+                    </button>
                   </span>
                 </label>
               </div>
@@ -365,6 +417,13 @@ export default function FormularioDenuncia({ punto, esAdmin, onGuardar, onCancel
                 ))}
               </div>
             </Seccion>
+          )}
+
+          {usaCaptcha && (
+            <div {...err('captcha')}>
+              <Captcha siteKey={CAPTCHA_SITE_KEY} onToken={(t) => { setTokenCaptcha(t); if (t) setErrores((e) => ({ ...e, captcha: undefined })) }} />
+              {errores.captcha && <span className="text-xs text-red-600">{errores.captcha}</span>}
+            </div>
           )}
 
           {errores.general && (

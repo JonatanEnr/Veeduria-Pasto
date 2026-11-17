@@ -1,5 +1,5 @@
 import Icono from './Iconos'
-import { Insignia } from './DetalleDenuncia'
+import { Insignia, ContadorDias } from './DetalleDenuncia'
 import { SECRETARIAS, obtenerSecretaria, ESTADOS, MODERACION } from '../constants/secretarias'
 import { haceCuanto } from '../utils/fechas'
 
@@ -49,8 +49,9 @@ function Cifra({ valor, etiqueta, punto }) {
 
 export default function PanelDenuncias({
   denuncias, publicadas, conteos, esAdmin, vista, onVista, filtros, onFiltros, onSeleccionar, cargando,
+  onEstadisticas, onLegal,
 }) {
-  const filtrosActivos = filtros.texto || filtros.estado || filtros.secretaria
+  const filtrosActivos = filtros.texto || filtros.estado || filtros.secretaria || filtros.comuna
   const select =
     'w-full min-w-0 rounded-lg border border-slate-300 bg-white px-2.5 py-2 text-sm text-slate-700 focus:border-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-900/10'
 
@@ -58,6 +59,16 @@ export default function PanelDenuncias({
     <div className="flex h-full min-h-0 flex-col">
       <div className="space-y-4 border-b border-slate-200 bg-slate-50/60 p-4">
         <Resumen publicadas={publicadas} />
+        <button type="button" onClick={onEstadisticas}
+          className="flex w-full items-center justify-between rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-left text-sm font-semibold text-slate-800 hover:border-slate-300 hover:shadow-sm">
+          <span className="flex items-center gap-2">
+            <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
+              <path d="M3 3v18h18M7 16v-3M12 16V8M17 16v-6" />
+            </svg>
+            Ranking de entidades y comunas
+          </span>
+          <span className="text-slate-400">›</span>
+        </button>
 
         {esAdmin && (
           <div className="grid grid-cols-3 gap-1 rounded-lg bg-slate-200/70 p-1 text-xs font-semibold">
@@ -97,6 +108,16 @@ export default function PanelDenuncias({
               <option value="">Todas las entidades</option>
               {SECRETARIAS.map((s) => <option key={s.id} value={s.id}>{s.corto}</option>)}
             </select>
+            <select value={filtros.comuna} onChange={(e) => onFiltros({ ...filtros, comuna: e.target.value })} className={select} aria-label="Filtrar por comuna">
+              <option value="">Todas las comunas</option>
+              {Array.from({ length: 12 }, (_, i) => <option key={i + 1} value={String(i + 1)}>Comuna {i + 1}</option>)}
+              <option value="0">Rural / otras</option>
+            </select>
+            <select value={filtros.orden} onChange={(e) => onFiltros({ ...filtros, orden: e.target.value })} className={select} aria-label="Ordenar">
+              <option value="recientes">Más recientes</option>
+              <option value="antiguas">Más días sin solución</option>
+              <option value="apoyos">Más confirmadas</option>
+            </select>
           </div>
         </div>
       </div>
@@ -104,7 +125,7 @@ export default function PanelDenuncias({
       <div className="flex items-center justify-between px-4 pb-1 pt-3 text-xs font-medium text-slate-500">
         <span>{denuncias.length} {denuncias.length === 1 ? 'resultado' : 'resultados'}</span>
         {filtrosActivos && (
-          <button type="button" onClick={() => onFiltros({ texto: '', estado: '', secretaria: '' })}
+          <button type="button" onClick={() => onFiltros({ ...filtros, texto: '', estado: '', secretaria: '', comuna: '' })}
             className="font-semibold text-slate-700 hover:text-slate-900">
             Limpiar filtros
           </button>
@@ -168,12 +189,26 @@ export default function PanelDenuncias({
                       {s.corto}
                     </span>
                   </div>
+                  {d.moderacion === 'aprobada' && (
+                    <div className="mt-1 flex items-center gap-2">
+                      <ContadorDias denuncia={d} compacto />
+                      {d.apoyos > 0 && <span className="text-[11px] text-slate-500">· {d.apoyos} confirman</span>}
+                    </div>
+                  )}
                 </div>
               </button>
             </li>
           )
         })}
       </ul>
+
+      <footer className="flex shrink-0 flex-wrap items-center justify-center gap-x-3 gap-y-1 border-t border-slate-100 px-4 py-2 text-[11px] text-slate-500">
+        <button type="button" onClick={() => onLegal('privacidad')} className="hover:text-slate-900 hover:underline">Política de datos</button>
+        <span aria-hidden="true">·</span>
+        <button type="button" onClick={() => onLegal('criterios')} className="hover:text-slate-900 hover:underline">Criterios de moderación</button>
+        <span aria-hidden="true">·</span>
+        <span>Mapa © OpenStreetMap</span>
+      </footer>
     </div>
   )
 }
